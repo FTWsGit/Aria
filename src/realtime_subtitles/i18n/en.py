@@ -13,10 +13,8 @@ TRANSLATIONS = {
     
     # Recognition settings
     "recognition_settings": "Recognition",
-    "mode_precise": "Precise",
     "mode_realtime": "Real-time",
     "mode_livecaptions": "Live Captions",
-    "mode_precise_desc": "Wait for complete sentences, suitable for speeches and videos",
     "mode_realtime_desc": "Word-by-word display, Sherpa (CN/EN) / Vosk (JP)",
     "mode_livecaptions_desc": "Use Windows 11 built-in Live Captions, requires 22H2+",
     
@@ -39,7 +37,6 @@ TRANSLATIONS = {
     "vad_label": "VAD (Voice Activity Detection)",
     "vad_on": "ON",
     "vad_off": "OFF",
-    "vad_desc_precise": "Auto sentence splitting, enable when audio is clear",
     "vad_desc_realtime": "This detection mode uses built-in endpoint detection",
     "silence_threshold": "Silence Threshold",
     "min_duration": "Min Duration",
@@ -128,23 +125,12 @@ TRANSLATIONS = {
     "tray_minimized_title": "Minimized to system tray",
     "tray_minimized_msg": "Right-click the tray icon to control subtitles or quit",
     
-    # Model names (for dropdown)
-    "model_large_v3": "Large-v3 ⭐ (Best)",
-    "model_large_v3_turbo": "Large-v3-turbo (Fast & Accurate)",
-    "model_medium": "Medium (Balanced)",
-    
     # Model manager - model names
-    "model_name_whisper_large_v3": "Whisper Large-v3",
-    "model_name_whisper_large_v3_turbo": "Whisper Large-v3 Turbo",
-    "model_name_whisper_medium": "Whisper Medium",
     "model_name_sherpa_zh_en": "Sherpa Chinese/English",
     "model_name_vosk_ja": "Vosk Japanese",
     "model_name_nllb": "NLLB Translation",
     
     # Model manager - descriptions
-    "model_desc_whisper_large_v3": "Highest accuracy, recommended for precise mode",
-    "model_desc_whisper_large_v3_turbo": "Fast and accurate",
-    "model_desc_whisper_medium": "Medium size, balanced performance and accuracy",
     "model_desc_sherpa_zh_en": "Real-time Chinese/English recognition",
     "model_desc_vosk_ja": "Real-time Japanese recognition",
     "model_desc_nllb": "Offline multilingual translation (600M)",

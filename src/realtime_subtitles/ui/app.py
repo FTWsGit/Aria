@@ -13,7 +13,7 @@ from typing import Optional, Union
 from .settings_window import SettingsWindow
 from .subtitle_overlay import SubtitleOverlay
 from .system_tray import SystemTray
-from ..pipeline import RealtimePipeline, SubtitleEvent
+from ..events import SubtitleEvent
 from ..vosk_pipeline import StreamingPipeline
 from ..livecaptions.pipeline import LiveCaptionsPipeline
 from ..model_manager import ModelManager, ModelType, ModelStatus
@@ -41,19 +41,13 @@ class App:
         self._settings_window: Optional[SettingsWindow] = None
         self._overlay: Optional[SubtitleOverlay] = None
         self._translation_overlay: Optional[SubtitleOverlay] = None
-        self._pipeline: Optional[Union[RealtimePipeline, StreamingPipeline, LiveCaptionsPipeline]] = None
+        self._pipeline: Optional[Union[StreamingPipeline, LiveCaptionsPipeline]] = None
         self._tray: Optional[SystemTray] = None
         self._is_running = False
         self._last_settings: Optional[dict] = None
-        self._is_streaming_mode = False
         self._is_livecaptions_mode = False
         self._enable_translation = False
         self._overlay_visible = True
-        
-        # For precise mode multi-line display
-        self._subtitle_lines: list = []
-        self._translation_lines: list = []
-        self._max_lines = 3
         
         # Pipeline signals for thread-safe updates
         self._signals = PipelineSignals()
@@ -150,8 +144,7 @@ class App:
         start_simple_log_session()
         
         # Check mode
-        mode = settings.get("mode", "precise")
-        self._is_streaming_mode = (mode == "realtime")
+        mode = settings.get("mode", "realtime")
         self._is_livecaptions_mode = (mode == "livecaptions")
         self._enable_translation = settings.get("enable_translation", False)
         
@@ -190,11 +183,10 @@ class App:
                 self._translation_overlay.close()
                 self._translation_overlay = None
             
-            # Set overlay mode
-            if self._is_streaming_mode:
-                self._overlay.set_multiline_mode(True)
-                if self._translation_overlay:
-                    self._translation_overlay.set_multiline_mode(True)
+            # Set overlay mode (realtime)
+            self._overlay.set_multiline_mode(True)
+            if self._translation_overlay:
+                self._translation_overlay.set_multiline_mode(True)
 
         # Apply hidden state immediately so start won't pop overlays when disabled.
         if not self._overlay_visible:
@@ -215,7 +207,7 @@ class App:
                         target_language=settings.get("target_language", "zho_Hant"),
                         auto_hide_window=False,  # Keep Windows LiveCaptions window visible
                     )
-                elif self._is_streaming_mode:
+                else:
                     # Use streaming pipeline
                     lang = settings.get("language") or "zh"  # Default to zh if None
                     self._pipeline = StreamingPipeline(
@@ -225,28 +217,6 @@ class App:
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
                         audio_source=settings.get("audio_source", "system"),
-                    )
-                else:
-                    # Use precise mode (Whisper)
-                    raw_lang = settings.get("language")
-                    whisper_lang = "zh" if raw_lang in ("zh_hans", "zh_hant") else raw_lang
-                    chinese_script = None
-                    if raw_lang == "zh_hans":
-                        chinese_script = "simplified"
-                    elif raw_lang == "zh_hant":
-                        chinese_script = "traditional"
-
-                    self._pipeline = RealtimePipeline(
-                        model=settings.get("model", "large-v3"),
-                        language=whisper_lang,
-                        use_vad=settings.get("use_vad", True),
-                        vad_silence_ms=settings.get("vad_silence_ms", 100),
-                        enable_translation=self._enable_translation,
-                        translation_engine=settings.get("translation_engine", "google"),
-                        target_language=settings.get("target_language", "zho_Hant"),
-                        audio_source=settings.get("audio_source", "system"),
-                        chinese_script=chinese_script,
-                        on_subtitle=lambda e: self._signals.subtitle.emit(e),
                     )
                 
                 self._pipeline.start()
@@ -329,23 +299,12 @@ class App:
         
         text = event.text
         language = event.language
-        translated = event.translated_text
-        
-        # For precise mode only, maintain history of lines
-        # Streaming modes show text directly
-        if not self._is_streaming_mode and text:
-            self._subtitle_lines.append(text)
-            if len(self._subtitle_lines) > self._max_lines:
-                self._subtitle_lines = self._subtitle_lines[-self._max_lines:]
-            display_text = "\n".join(self._subtitle_lines)
-        else:
-            display_text = text
+        display_text = text
         
         # Update overlay
         if self._overlay:
             self._overlay.update_subtitle(display_text, language)
         
-        # Update translation overlay
         # Update translation overlay
         if self._translation_overlay:
             # Check for dual-buffer fields (New Streaming/LiveCaptions logic)
@@ -359,19 +318,7 @@ class App:
                     committed_translation=event.committed_translation,
                     draft_translation=event.draft_translation
                 )
-            
-            # Fallback to legacy translated_text (Precise Mode)
-            elif translated:
-                if not self._is_streaming_mode and not self._is_livecaptions_mode:
-                    self._translation_lines.append(translated)
-                    if len(self._translation_lines) > self._max_lines:
-                        self._translation_lines = self._translation_lines[-self._max_lines:]
-                    display_translated = "\n".join(self._translation_lines)
-                else:
-                    display_translated = translated
-                
-                self._translation_overlay.update_subtitle(display_translated, "")
-    
+
     def _on_error(self, error: str) -> None:
         """Handle pipeline error."""
         self._is_running = False
@@ -396,9 +343,6 @@ class App:
         if self._translation_overlay:
             self._translation_overlay.hide()
         
-        self._subtitle_lines = []
-        self._translation_lines = []
-        
         self._settings_window.show_stopped()
         
         if self._tray:
@@ -408,7 +352,7 @@ class App:
         """Check if all required models are available and prompt to download if not."""
         missing_models = []
         manager = ModelManager()
-        mode = settings.get("mode", "precise")
+        mode = settings.get("mode", "realtime")
         
         # Skip model checks for LiveCaptions mode (uses Windows built-in)
         if mode == "livecaptions":
@@ -420,15 +364,6 @@ class App:
                         if status != ModelStatus.DOWNLOADED:
                             missing_models.append(m)
                         break
-        # Check Whisper model (only for precise mode)
-        elif mode == "precise":
-            model_id = settings.get("model", "large-v3")
-            for m in manager.get_all_models():
-                if m.model_type == ModelType.WHISPER and model_id in m.id:
-                    status = manager.get_status(m)
-                    if status != ModelStatus.DOWNLOADED:
-                        missing_models.append(m)
-                    break
         else:
             # Check realtime model (Sherpa for zh/en, Vosk for ja)
             lang = settings.get("language") or "zh"

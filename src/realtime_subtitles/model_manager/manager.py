@@ -14,7 +14,6 @@ from ..i18n import t
 
 class ModelType(Enum):
     """Types of models supported."""
-    WHISPER = "whisper"
     SHERPA = "sherpa"
     VOSK = "vosk"
     NLLB = "nllb"
@@ -52,34 +51,6 @@ class ModelInfo:
 # Registry of all supported models
 # Note: name_key and desc_key are i18n translation keys
 SUPPORTED_MODELS: List[ModelInfo] = [
-    # Whisper models (via faster-whisper / CTranslate2)
-    ModelInfo(
-        id="whisper-large-v3",
-        name="model_name_whisper_large_v3",  # Translation key
-        model_type=ModelType.WHISPER,
-        size_mb=3000,
-        description="model_desc_whisper_large_v3",  # Translation key
-        hf_repo="Systran/faster-whisper-large-v3",
-        local_folder="faster-whisper-large-v3",
-    ),
-    ModelInfo(
-        id="whisper-large-v3-turbo",
-        name="model_name_whisper_large_v3_turbo",
-        model_type=ModelType.WHISPER,
-        size_mb=1500,
-        description="model_desc_whisper_large_v3_turbo",
-        hf_repo="deepdml/faster-whisper-large-v3-turbo-ct2",
-        local_folder="faster-whisper-large-v3-turbo-ct2",
-    ),
-    ModelInfo(
-        id="whisper-medium",
-        name="model_name_whisper_medium",
-        model_type=ModelType.WHISPER,
-        size_mb=1500,
-        description="model_desc_whisper_medium",
-        hf_repo="Systran/faster-whisper-medium",
-        local_folder="faster-whisper-medium",
-    ),
     # Sherpa-ONNX models
     ModelInfo(
         id="sherpa-onnx-streaming-paraformer-zh",

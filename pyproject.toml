@@ -8,7 +8,7 @@ requires-python = ">=3.10"
 authors = [
     { name = "sayksii", email = "mark42967151@gmail.com" }
 ]
-keywords = ["subtitle", "speech-recognition", "whisper", "real-time", "accessibility", "transcription"]
+keywords = ["subtitle", "speech-recognition", "real-time", "accessibility", "transcription"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: End Users/Desktop",
@@ -21,7 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.24.0",
-    "faster-whisper>=1.0.0",
+    
     "PyAudioWPatch>=0.2.12.6",
     "PyQt6>=6.5.0",
     "pystray>=0.19.0",

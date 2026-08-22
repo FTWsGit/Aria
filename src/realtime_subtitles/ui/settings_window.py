@@ -26,22 +26,12 @@ class SettingsWindow(QMainWindow):
     """Main settings window with model selection, language, VAD options, etc."""
     
     # Model options
-    MODEL_IDS = ["large-v3", "large-v3-turbo", "medium"]
     LANGUAGE_CODES = [None, "zh", "en", "ja", "ko", "yue", "es", "fr", "de"]
     SYSTEM_AUDIO_LABEL = "Windows 正在播放的声音"
     MIC_DEFAULT_LABEL = "麦克风（系统默认）"
     
     # Signal for thread-safe updates
     status_update = pyqtSignal(str, str)  # text, color
-    
-    @staticmethod
-    def _get_whisper_models():
-        """Get Whisper models list with translated display names."""
-        return [
-            (t("model_large_v3"), "large-v3"),
-            (t("model_large_v3_turbo"), "large-v3-turbo"),
-            (t("model_medium"), "medium"),
-        ]
     
     @staticmethod
     def _get_realtime_languages():
@@ -76,10 +66,6 @@ class SettingsWindow(QMainWindow):
             (t("lang_german"), "de"),
             (t("lang_russian"), "ru"),
         ]
-    
-    @property
-    def WHISPER_MODELS(self):
-        return self._get_whisper_models()
     
     @property
     def REALTIME_LANGUAGES(self):
@@ -367,37 +353,11 @@ class SettingsWindow(QMainWindow):
         mode_layout.setContentsMargins(0, 0, 0, 0)
         mode_layout.addStretch()
         
-        self.mode_precise_btn = QPushButton(t("mode_precise"))
-        self.mode_precise_btn.setMinimumWidth(92)
-        self.mode_precise_btn.setMinimumHeight(38)
-        self.mode_precise_btn.setCheckable(True)
-        self.mode_precise_btn.setChecked(True)
-        self.mode_precise_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #888888;
-            }
-            QPushButton:hover {
-                background-color: #333333;
-                border-color: #3B8ED0;
-            }
-            QPushButton:checked {
-                background-color: #3B8ED0;
-                border: none;
-                color: white;
-            }
-            QPushButton:checked:hover {
-                background-color: #4AA3E0;
-            }
-        """)
-        self.mode_precise_btn.clicked.connect(lambda: self._on_mode_change("precise"))
-        mode_layout.addWidget(self.mode_precise_btn)
-        
         self.mode_realtime_btn = QPushButton(t("mode_realtime"))
         self.mode_realtime_btn.setMinimumWidth(92)
         self.mode_realtime_btn.setMinimumHeight(38)
         self.mode_realtime_btn.setCheckable(True)
+        self.mode_realtime_btn.setChecked(True)
         self.mode_realtime_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -450,7 +410,7 @@ class SettingsWindow(QMainWindow):
         layout.addLayout(mode_layout)
         
         # Mode description
-        self.mode_desc = QLabel(t("mode_precise_desc"))
+        self.mode_desc = QLabel(t("mode_realtime_desc"))
         self.mode_desc.setStyleSheet("color: #aaaaaa; font-size: 12px;")
         self.mode_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.mode_desc)
@@ -490,7 +450,7 @@ class SettingsWindow(QMainWindow):
         self.model_label = QLabel(t("model") + ":")
         model_row.addWidget(self.model_label)
         self.model_dropdown = QComboBox()
-        self.model_dropdown.addItems([m[0] for m in self.WHISPER_MODELS])
+        self.model_dropdown.addItems([m[0] for m in self.REALTIME_LANGUAGES])
         self.model_dropdown.currentTextChanged.connect(self._on_model_change)
         model_row.addWidget(self.model_dropdown)
         model_row.addStretch()
@@ -585,7 +545,7 @@ class SettingsWindow(QMainWindow):
         layout.addLayout(vad_row)
         
         # VAD description
-        self.vad_desc = QLabel(t("vad_desc_precise"))
+        self.vad_desc = QLabel(t("vad_desc_realtime"))
         self.vad_desc.setStyleSheet("color: #aaaaaa; font-size: 12px;")
         self.vad_desc.setWordWrap(True)
         layout.addWidget(self.vad_desc)
@@ -671,39 +631,7 @@ class SettingsWindow(QMainWindow):
     
     def _on_mode_change(self, mode: str):
         """Handle mode button click."""
-        if mode == "precise":
-            self.mode_precise_btn.setChecked(True)
-            self.mode_realtime_btn.setChecked(False)
-            self.mode_livecaptions_btn.setChecked(False)
-            self.mode_desc.setText(t("mode_precise_desc"))
-            # Swap to Whisper models
-            self.model_label.setText(t("model") + ":")  # Restore label to "模型:"
-            self.model_label.show()  # Ensure label is visible
-            self.model_dropdown.clear()
-            self.model_dropdown.addItems([m[0] for m in self.WHISPER_MODELS])
-            self.model_dropdown.setEnabled(True)
-            self.model_dropdown.show()  # Ensure dropdown is visible
-            # Show and restore full language list
-            self.lang_label.show()
-            self.lang_dropdown.show()
-            self.lang_dropdown.clear()
-            self.lang_dropdown.addItems([l[0] for l in self.LANGUAGES])
-            self.lang_dropdown.setEnabled(True)
-            self.manage_models_btn.show()
-            self.vad_checkbox.setEnabled(True)
-            self.vad_desc.setText(t("vad_desc_precise"))
-            # Normal styling for VAD card
-            self.vad_label.setStyleSheet("color: white;")
-            self.vad_status.setStyleSheet("color: #3B8ED0;")
-            self.vad_checkbox.setStyleSheet("")  # Reset to default
-            self.vad_card.setStyleSheet("")
-            # Normal styling for Model card
-            self.model_label.setStyleSheet("color: white;")
-            self.lang_label.setStyleSheet("color: white;")
-            self.model_card.setEnabled(True)
-            self.model_card.setStyleSheet("")
-        elif mode == "realtime":
-            self.mode_precise_btn.setChecked(False)
+        if mode == "realtime":
             self.mode_realtime_btn.setChecked(True)
             self.mode_livecaptions_btn.setChecked(False)
             self.mode_desc.setText(t("mode_realtime_desc"))
@@ -735,7 +663,6 @@ class SettingsWindow(QMainWindow):
             self.model_card.setEnabled(True)
             self.model_card.setStyleSheet("")
         else:  # livecaptions mode
-            self.mode_precise_btn.setChecked(False)
             self.mode_realtime_btn.setChecked(False)
             self.mode_livecaptions_btn.setChecked(True)
             self.mode_desc.setText(t("mode_livecaptions_desc"))
@@ -902,9 +829,7 @@ class SettingsWindow(QMainWindow):
     def _gather_settings(self) -> dict:
         """Gather current settings into a dictionary."""
         # Determine mode
-        if self.mode_precise_btn.isChecked():
-            mode = "precise"
-        elif self.mode_livecaptions_btn.isChecked():
+        if self.mode_livecaptions_btn.isChecked():
             mode = "livecaptions"
         else:
             mode = "realtime"
@@ -912,21 +837,7 @@ class SettingsWindow(QMainWindow):
         # Get model value
         model_display = self.model_dropdown.currentText()
         
-        if mode == "precise":
-            # Precise mode: model dropdown shows Whisper models
-            model_id = "large-v3"
-            for display, mid in self.WHISPER_MODELS:
-                if display == model_display:
-                    model_id = mid
-                    break
-            # Get language from lang dropdown
-            lang_display = self.lang_dropdown.currentText()
-            lang_code = None
-            for display, lcode in self.LANGUAGES:
-                if display == lang_display:
-                    lang_code = lcode
-                    break
-        elif mode == "livecaptions":
+        if mode == "livecaptions":
             # LiveCaptions mode: no model/language selection needed
             model_id = None
             lang_code = None
@@ -962,7 +873,7 @@ class SettingsWindow(QMainWindow):
             "language": lang_code,
             "timezone": tz_name,
             "use_vad": self.vad_checkbox.isChecked(),
-            "vad_silence_ms": 100 if mode == "precise" else 500,
+            "vad_silence_ms": 500,
             "enable_translation": self.trans_checkbox.isChecked(),
             "translation_engine": engine,
             "target_language": target_lang,
@@ -1003,37 +914,18 @@ class SettingsWindow(QMainWindow):
         """Load saved settings from previous session."""
         sm = get_settings_manager()
         
-        # Mode (handle legacy Chinese values)
+        # Mode (handle legacy Chinese values and removed "precise" mode)
         mode = sm.get("mode", "realtime")
-        if mode in ["實時", "realtime"]:
+        if mode in ["實時", "realtime", "精準", "precise"]:
             mode = "realtime"
-        elif mode in ["精準", "precise"]:
-            mode = "precise"
         self._on_mode_change(mode)
         
-        if mode == "precise":
-            # Load Whisper model
-            model_id = sm.get("model", "large-v3")
-            for display, mid in self.WHISPER_MODELS:
-                if mid == model_id:
-                    self.model_dropdown.setCurrentText(display)
-                    break
-            # Load language
-            lang_code = sm.get("language", None)
-            if lang_code == "zh":
-                # Backward compatibility with old single Chinese option
-                lang_code = "zh_hans"
-            for display, lcode in self.LANGUAGES:
-                if lcode == lang_code:
-                    self.lang_dropdown.setCurrentText(display)
-                    break
-        else:
-            # Realtime mode: load language to model dropdown
-            lang_code = sm.get("language", "zh")
-            for display, lcode in self.REALTIME_LANGUAGES:
-                if lcode == lang_code:
-                    self.model_dropdown.setCurrentText(display)
-                    break
+        # Load language to model dropdown (both realtime and livecaptions use this)
+        lang_code = sm.get("language", "zh")
+        for display, lcode in self.REALTIME_LANGUAGES:
+            if lcode == lang_code:
+                self.model_dropdown.setCurrentText(display)
+                break
         
         # Translation
         self.trans_checkbox.setChecked(sm.get("enable_translation", False))

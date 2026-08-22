@@ -14,7 +14,7 @@ from typing import Optional, Callable, Union
 import numpy as np
 
 from .audio.capture import AudioCapture
-from .pipeline import SubtitleEvent
+from .events import SubtitleEvent
 from .logger import info, debug, warning, error, transcript
 
 # Import transcribers with fallbacks

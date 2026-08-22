@@ -261,9 +261,6 @@ class ModelManagerWindow(QDialog):
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setSpacing(10)
         
-        # Whisper models section
-        self._create_model_section(scroll_layout, t("whisper_models"), [ModelType.WHISPER])
-        
         # Translation models section
         self._create_model_section(scroll_layout, t("translation_models"), [ModelType.NLLB])
         

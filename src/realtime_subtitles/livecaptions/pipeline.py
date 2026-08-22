@@ -10,7 +10,7 @@ from typing import Optional, Callable
 from .monitor import LiveCaptionsMonitor, CaptionEvent
 from .controller import LiveCaptionsController
 from .manager import TranslationStateManager
-from ..pipeline import SubtitleEvent
+from ..events import SubtitleEvent
 from ..logger import info, debug, warning, error
 
 # Translation support (optional)

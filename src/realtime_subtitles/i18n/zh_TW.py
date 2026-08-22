@@ -13,10 +13,8 @@ TRANSLATIONS = {
     
     # Recognition settings
     "recognition_settings": "辨識設定",
-    "mode_precise": "精準",
     "mode_realtime": "即時",
     "mode_livecaptions": "內建字幕",
-    "mode_precise_desc": "等待完整句子後再顯示，適合演講、影片",
     "mode_realtime_desc": "逐字顯示，Sherpa (中/英) / Vosk (日)",
     "mode_livecaptions_desc": "使用 Windows 11 內建即時字幕，需 22H2+ 版本",
     
@@ -39,7 +37,6 @@ TRANSLATIONS = {
     "vad_label": "語音偵測 (VAD)",
     "vad_on": "ON",
     "vad_off": "OFF",
-    "vad_desc_precise": "自動分句，建議聲音清晰時再開啟",
     "vad_desc_realtime": "此偵測模式使用內建端點偵測，無法調整",
     "silence_threshold": "靜音閾值",
     "min_duration": "最短片段",
@@ -128,23 +125,12 @@ TRANSLATIONS = {
     "tray_minimized_title": "程式已最小化到系統托盤",
     "tray_minimized_msg": "右鍵點擊托盤圖示可以控制字幕或退出程式",
     
-    # Model names (for dropdown)
-    "model_large_v3": "Large-v3 ⭐ (最準)",
-    "model_large_v3_turbo": "Large-v3-turbo (快速高準)",
-    "model_medium": "Medium (平衡)",
-    
     # Model manager - model names
-    "model_name_whisper_large_v3": "Whisper Large-v3",
-    "model_name_whisper_large_v3_turbo": "Whisper Large-v3 Turbo",
-    "model_name_whisper_medium": "Whisper Medium",
     "model_name_sherpa_zh_en": "Sherpa 中/英文",
     "model_name_vosk_ja": "Vosk 日文",
     "model_name_nllb": "NLLB 翻譯模型",
     
     # Model manager - descriptions
-    "model_desc_whisper_large_v3": "最高準確度，適合精準模式",
-    "model_desc_whisper_large_v3_turbo": "快速且準確",
-    "model_desc_whisper_medium": "中等大小，平衡效能與準確度",
     "model_desc_sherpa_zh_en": "實時中英文辨識",
     "model_desc_vosk_ja": "實時日文辨識",
     "model_desc_nllb": "離線多語言翻譯 (600M 版本)",

@@ -13,8 +13,8 @@ class SettingsManager:
     """Manages saving and loading user settings."""
     
     DEFAULT_SETTINGS = {
-        "mode": "precise",
-        "model": "large-v3",
+        "mode": "realtime",
+        "model": None,
         "language": None,
         "vad_enabled": True,
         "use_vad": True,
