@@ -24,6 +24,12 @@ class ModelSpec:
     params: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
+    def get_size_display(self) -> str:
+        """Get human-readable size string."""
+        if self.size_mb >= 1024:
+            return f"{self.size_mb / 1024:.1f}GB"
+        return f"{self.size_mb}MB"
+
 
 class ModelRegistry:
     """Scans models/ for *.yaml files and builds a model spec index."""

@@ -71,7 +71,7 @@ uv run python -c "import aria; print('import ok')"
 
 ## 流式 ASR 指南
 
-ARIA 的唯一 ASR 后端是 Sherpa-ONNX OnlineRecognizer，真正的流式识别器，持续产生 partial result。模型文件由用户自行管理，放置在 `models/` 目录下，管道自动发现。
+ARIA 有两条 ASR 路径：`asr_streaming`（Sherpa-ONNX OnlineRecognizer，真正的流式识别器，持续产生 partial result）和 `asr_chunked`（whisper-http，按时间窗口攒块发送 HTTP 请求）。模型配置由 `ModelRegistry` 扫描 `models/*.yaml` 驱动，权重文件放置在 `models_cache/` 下。不再使用自动 glob 发现模型文件。
 
 流式 ASR 开发注意事项：
 

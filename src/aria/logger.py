@@ -5,6 +5,7 @@ Provides file and console logging with session-based detailed/simple logs.
 """
 
 import logging
+import logging.handlers
 import sys
 from pathlib import Path
 
@@ -18,14 +19,24 @@ _simple_file_handler = None
 _simple_log_mode = "session"
 
 
-class _InstantAppendFileHandler(logging.Handler):
-    """Append one log line at a time and flush immediately."""
+# Rotating log limits
+MAX_LOG_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_LOG_BACKUPS = 3
+MAX_LOG_AGE_DAYS = 7
 
-    def __init__(self, file_path: Path, level: int = logging.NOTSET):
-        super().__init__(level)
-        self.file_path = Path(file_path)
 
-    # Disable logging's default thread lock behavior for this handler.
+class _RotatingAppendFileHandler(logging.handlers.RotatingFileHandler):
+    """Rotating file handler with immediate flush and no locking.
+
+    Inherits size-based rotation from RotatingFileHandler.
+    Keeps file open between writes for efficiency, flushes after each emit.
+    """
+
+    def __init__(self, file_path: Path, maxBytes: int = MAX_LOG_BYTES, backupCount: int = MAX_LOG_BACKUPS, **kwargs):
+        kwargs.setdefault("encoding", "utf-8")
+        super().__init__(str(file_path), maxBytes=maxBytes, backupCount=backupCount, **kwargs)
+
+    # Disable logging's default thread lock for this handler.
     def createLock(self):
         self.lock = None
 
@@ -36,13 +47,8 @@ class _InstantAppendFileHandler(logging.Handler):
         return
 
     def emit(self, record: logging.LogRecord) -> None:
-        try:
-            msg = self.format(record)
-            with open(self.file_path, "a", encoding="utf-8") as f:
-                f.write(msg + "\n")
-                f.flush()
-        except Exception:
-            self.handleError(record)
+        super().emit(record)
+        self.flush()
 
 
 class _ConsoleModeFilter(logging.Filter):
@@ -93,6 +99,29 @@ def get_log_dir() -> Path:
     return log_dir
 
 
+class _TranscriptFilter(logging.Filter):
+    """Exclude transcript records from detail log (they go to simple log)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not getattr(record, "is_transcript", False)
+
+
+def _cleanup_old_logs(max_age_days: int = MAX_LOG_AGE_DAYS) -> None:
+    """Delete log files older than max_age_days. Graceful on any error."""
+    try:
+        log_dir = get_log_dir()
+        cutoff = now_in_app_timezone().timestamp() - max_age_days * 86400
+        for pattern in ["detail_*.log*", "simple_*.log*"]:
+            for f in log_dir.glob(pattern):
+                try:
+                    if f.stat().st_mtime < cutoff:
+                        f.unlink()
+                except OSError:
+                    pass
+    except Exception:
+        pass
+
+
 def setup_logger(name: str = "ARIA", level: int = logging.DEBUG) -> logging.Logger:
     """
     Set up and return the application logger.
@@ -116,6 +145,9 @@ def setup_logger(name: str = "ARIA", level: int = logging.DEBUG) -> logging.Logg
     if _logger.handlers:
         return _logger
 
+    # Clean up old logs before creating new ones
+    _cleanup_old_logs()
+
     # Log format
     formatter = _ConsoleModeFormatter(
         fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
@@ -133,9 +165,10 @@ def setup_logger(name: str = "ARIA", level: int = logging.DEBUG) -> logging.Logg
     ts = now_in_app_timezone().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"detail_{ts}.log"
 
-    file_handler = _InstantAppendFileHandler(log_file)
+    file_handler = _RotatingAppendFileHandler(log_file)
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(_TranscriptFilter())
     _logger.addHandler(file_handler)
 
     _logger.info(f"Logger initialized. Log file: {log_file}")
@@ -206,8 +239,8 @@ def set_transcript_source(ts_path: str | None) -> None:
     return
 
 
-def _build_simple_handler(path: Path) -> _InstantAppendFileHandler:
-    handler = _InstantAppendFileHandler(path)
+def _build_simple_handler(path: Path) -> _RotatingAppendFileHandler:
+    handler = _RotatingAppendFileHandler(path)
     handler.setLevel(logging.INFO)
     handler.setFormatter(_SimpleFormatter("%(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
     return handler

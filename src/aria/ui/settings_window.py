@@ -41,8 +41,6 @@ class SettingsWindow(QMainWindow):
 
     # Model options
     LANGUAGE_CODES = [None, "zh", "en", "ja", "ko", "yue", "es", "fr", "de"]
-    SYSTEM_AUDIO_LABEL = "Windows 正在播放的声音"
-    MIC_DEFAULT_LABEL = "麦克风（系统默认）"
 
     # Signal for thread-safe updates
     status_update = pyqtSignal(str, str)  # text, color
@@ -428,7 +426,7 @@ class SettingsWindow(QMainWindow):
 
         # Audio source selector
         source_row = QHBoxLayout()
-        source_row.addWidget(QLabel("音频来源:"))
+        source_row.addWidget(QLabel(t("audio_source_label")))
         self.audio_source_dropdown = QComboBox()
         self._populate_audio_source_dropdown()
         self.audio_source_dropdown.currentTextChanged.connect(self._on_audio_source_change)
@@ -680,7 +678,7 @@ class SettingsWindow(QMainWindow):
         quick_row = QHBoxLayout()
         quick_row.setSpacing(10)
 
-        self.overlay_toggle_button = QPushButton("隐藏字幕悬浮窗")
+        self.overlay_toggle_button = QPushButton(t("overlay_hide"))
         self.overlay_toggle_button.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -832,17 +830,17 @@ class SettingsWindow(QMainWindow):
         self.audio_source_dropdown.clear()
 
         # Keep existing logic options first.
-        self.audio_source_dropdown.addItem(self.SYSTEM_AUDIO_LABEL, "system")
-        self.audio_source_dropdown.addItem(self.MIC_DEFAULT_LABEL, AudioCapture.MIC_DEFAULT_SOURCE)
+        self.audio_source_dropdown.addItem(t("audio_source_system"), "system")
+        self.audio_source_dropdown.addItem(t("audio_source_mic"), AudioCapture.MIC_DEFAULT_SOURCE)
 
         for mic in AudioCapture.list_microphone_devices():
             idx = mic.get("index")
             name = (mic.get("name") or "").strip()
             if idx is None or not name:
                 continue
-            label = f"麦克风: {name}"
+            label = t("mic_device_label", name=name)
             if mic.get("is_default"):
-                label = f"麦克风（默认设备）: {name}"
+                label = t("mic_default_device_label", name=name)
             self.audio_source_dropdown.addItem(label, f"{AudioCapture.MIC_SOURCE_PREFIX}{idx}")
 
         index = self.audio_source_dropdown.findData(selected_source)
@@ -890,7 +888,7 @@ class SettingsWindow(QMainWindow):
         if not self.on_toggle_overlay:
             return
         is_visible = self.on_toggle_overlay()
-        self.overlay_toggle_button.setText("隐藏字幕悬浮窗" if is_visible else "显示字幕悬浮窗")
+        self.overlay_toggle_button.setText(t("overlay_hide") if is_visible else t("overlay_show"))
 
     def _on_ui_language_change(self, lang_display: str):
         """Handle UI language change."""
@@ -1070,7 +1068,7 @@ class SettingsWindow(QMainWindow):
 
         # Overlay toggle state
         overlay_visible = sm.get("overlay_visible", True)
-        self.overlay_toggle_button.setText("隐藏字幕悬浮窗" if overlay_visible else "显示字幕悬浮窗")
+        self.overlay_toggle_button.setText(t("overlay_hide") if overlay_visible else t("overlay_show"))
 
         # OpenAI params
         self.openai_endpoint.setText(sm.get("openai_endpoint", "http://127.0.0.1:1234/v1"))

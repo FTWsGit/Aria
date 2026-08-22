@@ -11,6 +11,8 @@ from collections.abc import Callable
 import pystray
 from PIL import Image, ImageDraw
 
+from ..i18n import t
+
 
 class SystemTray:
     """
@@ -78,18 +80,18 @@ class SystemTray:
         """Create the context menu."""
         return pystray.Menu(
             pystray.MenuItem(
-                "顯示設定",
+                t("tray_show_settings"),
                 self._on_show_click,
-                default=True,  # Double-click action
+                default=True,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "開始/停止 字幕",
+                t("tray_toggle_subtitles"),
                 self._on_toggle_click,
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "退出",
+                t("tray_quit"),
                 self._on_quit_click,
             ),
         )

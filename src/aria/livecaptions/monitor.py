@@ -117,7 +117,7 @@ class LiveCaptionsMonitor:
                 caption_element = window.TextControl(AutomationId="CaptionsTextBlock", searchDepth=10)
                 if caption_element and caption_element.Exists(maxSearchSeconds=0.5):
                     return caption_element
-            except:
+            except Exception:
                 pass
 
             # Fall back to ReadyToCaptionTextBlock (initial state)
@@ -125,7 +125,7 @@ class LiveCaptionsMonitor:
                 ready_element = window.TextControl(AutomationId="ReadyToCaptionTextBlock", searchDepth=10)
                 if ready_element and ready_element.Exists(maxSearchSeconds=0.5):
                     return ready_element
-            except:
+            except Exception:
                 pass
 
             # Search by index as last resort
@@ -136,7 +136,7 @@ class LiveCaptionsMonitor:
                         automation_id = getattr(text_ctrl, "AutomationId", "") or ""
                         if automation_id in ["CaptionsTextBlock", "ReadyToCaptionTextBlock"]:
                             return text_ctrl
-            except:
+            except Exception:
                 pass
 
             return None
@@ -215,7 +215,7 @@ class LiveCaptionsMonitor:
                         try:
                             # Test if element is still valid by accessing a property
                             _ = self._caption_element.ClassName
-                        except:
+                        except Exception:
                             # Element reference is stale, re-find it
                             debug("LiveCaptionsMonitor: Element reference stale, re-finding...")
                             self._caption_element = None
@@ -226,7 +226,7 @@ class LiveCaptionsMonitor:
                             text_from_name = self._caption_element.Name
                             if text_from_name is not None:  # Accept empty string
                                 current_text = text_from_name
-                        except:
+                        except Exception:
                             pass
 
                     # If current_text is None (not empty string), it means read failed

@@ -50,12 +50,6 @@ class ModelInfo:
         return f"{self.size_mb}MB"
 
 
-# Model list is now driven by ModelRegistry (scans models/ *.yaml files).
-# This list is kept for backward compatibility with ModelInfo-based UI code.
-# Use ModelRegistry.list() for new code.
-SUPPORTED_MODELS: list[ModelInfo] = []
-
-
 class ModelManager:
     """Manages model downloading and status."""
 
@@ -102,10 +96,7 @@ class ModelManager:
             if model.source.get("type") == "manual":
                 return Path(model.source["path"])
             return self.cache_dir / model.id
-        # Legacy ModelInfo path
-        if model.local_folder:
-            return self.models_dir / model.local_folder
-        return self.models_dir / model.id
+        return self.cache_dir / model.id
 
     def is_downloaded(self, model: ModelInfo | ModelSpec) -> bool:
         """Check if model files are fully downloaded."""
@@ -119,10 +110,7 @@ class ModelManager:
                 return all((model_path / f).exists() for f in files)
             return any(model_path.iterdir())
 
-        # Legacy ModelInfo check
-        return (model.hf_repo and (any(model_path.glob("*.bin")) or any(model_path.glob("*.safetensors")))) or (
-            model.download_url and model_path.is_dir() and any(model_path.iterdir())
-        )
+        return False
 
     def get_status(self, model: ModelInfo | ModelSpec) -> ModelStatus:
         """Check if a model is downloaded."""
@@ -194,10 +182,6 @@ class ModelManager:
                     return
                 else:
                     raise ValueError(f"Unknown source type: {source_type}")
-            elif model.hf_repo:
-                self._download_from_huggingface(model, callback)
-            elif model.download_url:
-                self._download_from_url(model, callback)
 
             self._download_progress[model.id] = 1.0
             if callback:
@@ -211,155 +195,6 @@ class ModelManager:
         finally:
             if model.id in self._download_threads:
                 del self._download_threads[model.id]
-
-    def _download_from_huggingface(
-        self,
-        model: ModelInfo,
-        callback: Callable[[str, float, str], None] | None,
-    ) -> None:
-        """Download model from Hugging Face Hub."""
-        try:
-            from huggingface_hub import HfApi, hf_hub_download
-        except ImportError as err:
-            raise RuntimeError(t("download_status_install_hf")) from err
-
-        model_path = self.get_model_path(model)
-
-        if callback:
-            callback(model.id, 0.05, t("download_status_downloading").format(name=t(model.name)))
-
-        api = HfApi()
-        repo_info = api.repo_info(model.hf_repo, repo_type="model")
-        files = list(repo_info.siblings or [])
-
-        # Calculate total bytes (if available)
-        total_bytes = 0
-        for f in files:
-            if getattr(f, "size", None):
-                total_bytes += f.size
-
-        def local_file_size(path: Path) -> int:
-            try:
-                return path.stat().st_size
-            except Exception:
-                return 0
-
-        downloaded_bytes = 0
-        downloaded_files = 0
-        for f in files:
-            local_path = model_path / f.rfilename
-            if local_path.exists() and local_path.is_file():
-                downloaded_files += 1
-                downloaded_bytes += local_file_size(local_path)
-
-        if callback:
-            callback(model.id, 0.01, t("download_status_downloading").format(name=t(model.name)))
-
-        last_reported = {"percent": -5}
-
-        for f in files:
-            hf_hub_download(
-                repo_id=model.hf_repo,
-                filename=f.rfilename,
-                local_dir=str(model_path),
-            )
-
-            downloaded_files += 1
-            if getattr(f, "size", None):
-                downloaded_bytes += f.size
-            else:
-                downloaded_bytes += local_file_size(model_path / f.rfilename)
-
-            if total_bytes > 0:
-                progress = min(0.95, downloaded_bytes / total_bytes)
-            else:
-                progress = min(0.95, downloaded_files / max(1, len(files)))
-
-            if callback:
-                callback(model.id, progress, t("download_status_downloading").format(name=t(model.name)))
-
-            percent = int(progress * 100)
-            if percent - last_reported["percent"] >= 5:
-                last_reported["percent"] = percent
-                print(f"[ModelManager] {t(model.name)}: {percent}%")
-
-        if callback:
-            callback(model.id, 0.98, t("download_status_verifying"))
-        print(f"[ModelManager] {t(model.name)}: 98% ({t('download_status_verifying')})")
-
-    def _download_from_url(
-        self,
-        model: ModelInfo,
-        callback: Callable[[str, float, str], None] | None,
-    ) -> None:
-        """Download model from direct URL."""
-        import tarfile
-        import tempfile
-        import urllib.request
-        import zipfile
-
-        model_path = self.get_model_path(model)
-        url = model.download_url
-
-        if callback:
-            callback(model.id, 0.05, t("download_status_downloading").format(name=t(model.name)))
-
-        last_reported = {"percent": -5}
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=self._get_archive_suffix(url)) as tmp:
-            tmp_path = tmp.name
-
-            def report_progress(block_num, block_size, total_size):
-                if total_size > 0:
-                    progress = min(0.8, block_num * block_size / total_size * 0.8)
-                    self._download_progress[model.id] = progress
-                    if callback:
-                        downloaded_mb = block_num * block_size / 1024 / 1024
-                        total_mb = total_size / 1024 / 1024
-                        callback(
-                            model.id,
-                            progress,
-                            t("download_status_progress").format(
-                                downloaded=f"{downloaded_mb:.0f}", total=f"{total_mb:.0f}"
-                            ),
-                        )
-                    percent = int(progress * 100)
-                    if percent - last_reported["percent"] >= 5:
-                        last_reported["percent"] = percent
-                        print(f"[ModelManager] {t(model.name)}: {percent}%")
-
-            urllib.request.urlretrieve(url, tmp_path, report_progress)
-
-        if callback:
-            callback(model.id, 0.85, t("download_status_extracting"))
-        print(f"[ModelManager] {t(model.name)}: 85% ({t('download_status_extracting')})")
-
-        model_path.mkdir(parents=True, exist_ok=True)
-
-        if url.endswith(".zip"):
-            with zipfile.ZipFile(tmp_path, "r") as zf:
-                zf.extractall(model_path.parent)
-        elif url.endswith(".tar.bz2") or url.endswith(".tar.gz"):
-            with tarfile.open(tmp_path, "r:*") as tf:
-                tf.extractall(model_path.parent)
-
-        os.unlink(tmp_path)
-
-        # Notify completion
-        if callback:
-            callback(model.id, 1.0, t("download_status_complete"))
-        print(f"[ModelManager] {t(model.name)}: 100% ({t('download_status_complete')})")
-
-    @staticmethod
-    def _get_archive_suffix(url: str) -> str:
-        """Get archive suffix from URL."""
-        if ".tar.bz2" in url:
-            return ".tar.bz2"
-        elif ".tar.gz" in url:
-            return ".tar.gz"
-        elif ".zip" in url:
-            return ".zip"
-        return ""
 
     def _download_hf_spec(
         self,
@@ -380,7 +215,7 @@ class ModelManager:
             callback(model.id, 0.05, t("download_status_downloading").format(name=model.display_name))
 
         if callback:
-            callback(model.id, 0.06, "下载中，请稍候...")
+            callback(model.id, 0.06, t("download_status_waiting"))
 
         kwargs = {"local_dir": str(local_dir), "local_dir_use_symlinks": False}
         if files:
@@ -410,7 +245,7 @@ class ModelManager:
             callback(model.id, 0.05, t("download_status_downloading").format(name=model.display_name))
 
         if callback:
-            callback(model.id, 0.06, "下载中，请稍候...")
+            callback(model.id, 0.06, t("download_status_waiting"))
 
         kwargs = {"local_dir": str(local_dir)}
         if files:
@@ -427,7 +262,6 @@ class ModelManager:
         callback: Callable[[str, float, str], None] | None,
     ) -> None:
         """Download model from direct URL using ModelSpec."""
-        import os
         import tarfile
         import tempfile
         import urllib.request
@@ -484,21 +318,4 @@ class ModelManager:
                 print(f"[ModelManager] Delete error: {e}")
         return False
 
-    def get_all_models(self) -> list[ModelInfo]:
-        """Get list of all supported models (from registry)."""
-        models = []
-        for spec in self.registry.list():
-            info = ModelInfo(
-                id=spec.id,
-                name=spec.display_name,
-                model_type=ModelType.SHERPA,
-                size_mb=spec.size_mb,
-                description=spec.language,
-                local_folder=spec.id,
-            )
-            models.append(info)
-        return models
 
-    def get_models_by_type(self, model_type: ModelType) -> list[ModelInfo]:
-        """Get models of a specific type."""
-        return [m for m in SUPPORTED_MODELS if m.model_type == model_type]

@@ -113,4 +113,31 @@ TRANSLATIONS = {
     "cancel_download": "取消下载",
     "download_waiting": "等待下载...",
     "download_progress_note": "进度条可能不准，会随网络状况跳动",
+    # Error messages
+    "error_asr_backend_failed": "识别服务出现异常，已自动停止",
+    "error_translation_unavailable": "翻译服务暂时不可用",
+    "error_pipeline_startup": "启动识别服务失败，请检查配置",
+    "open_model_manager_btn": "打开模型管理",
+    "model_required_download_title": "模型未下载",
+    "model_required_download_msg": "模型 '{model_id}' 尚未下载。\n请先在模型管理中下载。",
+    # Tray menu
+    "tray_show_settings": "显示设置",
+    "tray_toggle_subtitles": "开始/停止 字幕",
+    "tray_quit": "退出",
+    # Audio source
+    "audio_source_system": "系统音频",
+    "audio_source_mic": "麦克风（系统默认）",
+    "audio_source_label": "音频来源:",
+    # Overlay toggle
+    "overlay_hide": "隐藏字幕悬浮窗",
+    "overlay_show": "显示字幕悬浮窗",
+    # Mic device
+    "mic_device_label": "麦克风: {name}",
+    "mic_default_device_label": "麦克风（默认设备）: {name}",
+    # Download
+    "download_status_waiting": "下载中，请稍候...",
+    # Streaming models section
+    "streaming_models": "流式识别模型",
+    "open_models_folder": "打开模型文件夹",
+    "close": "关闭",
 }

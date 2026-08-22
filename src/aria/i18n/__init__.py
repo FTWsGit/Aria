@@ -4,7 +4,7 @@ Internationalization (i18n) module for Real-time Subtitles.
 Provides multi-language support for the UI.
 """
 
-from typing import Dict, Optional
+import contextlib
 
 from aria.settings_manager import get_settings_manager
 
@@ -77,10 +77,8 @@ def get_text(key: str, **kwargs) -> str:
 
     # Apply format arguments if provided
     if kwargs:
-        try:
+        with contextlib.suppress(KeyError):
             text = text.format(**kwargs)
-        except KeyError:
-            pass
 
     return text
 

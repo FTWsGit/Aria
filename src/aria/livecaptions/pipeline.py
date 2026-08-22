@@ -14,9 +14,9 @@ from .monitor import CaptionEvent, LiveCaptionsMonitor
 
 # Translation support (optional)
 try:
-    from ..translation.translator import GOOGLETRANS_AVAILABLE, TRANSLATORS_AVAILABLE, create_translator
+    from ..translation.translator import create_translator
 
-    TRANSLATION_AVAILABLE = TRANSLATORS_AVAILABLE or GOOGLETRANS_AVAILABLE
+    TRANSLATION_AVAILABLE = True
 except ImportError:
     TRANSLATION_AVAILABLE = False
     create_translator = None

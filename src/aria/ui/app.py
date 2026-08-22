@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import QApplication
 from ..events import SubtitleEvent
 from ..i18n import t
 from ..livecaptions.pipeline import LiveCaptionsPipeline
-from ..logger import set_console_mode, start_simple_log_session
+from ..logger import exception, set_console_mode, start_simple_log_session
 from ..model_manager.manager import ModelManager
 from ..model_manager.registry import ModelRegistry
 from ..pipeline import StreamingPipeline
@@ -215,6 +215,7 @@ class App:
                         registry=self._registry,
                         model_manager=self._model_manager,
                         on_subtitle=lambda e: self._signals.subtitle.emit(e),
+                        on_error=lambda msg: self._signals.error.emit(msg),
                         enable_translation=self._enable_translation,
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
@@ -230,8 +231,9 @@ class App:
                 self._pipeline.start()
                 self._signals.started.emit()
 
-            except Exception as e:
-                self._signals.error.emit(str(e))
+            except Exception:
+                exception("Pipeline creation failed")
+                self._signals.error.emit("error_pipeline_startup")
 
         # Start pipeline in background thread
         threading.Thread(target=create_pipeline, daemon=True).start()
@@ -332,7 +334,8 @@ class App:
         """Handle pipeline error."""
         self._is_running = False
         self._settings_window.show_stopped()
-        self._settings_window.status_label.setText(f"Error: {error}")
+        display_msg = t(error)
+        self._settings_window.status_label.setText(display_msg)
         self._settings_window.status_label.setStyleSheet("color: red;")
 
         if self._tray:
@@ -370,13 +373,22 @@ class App:
             return True
 
         if not self._model_manager.is_downloaded(spec):
-            from PyQt6.QtWidgets import QMessageBox
+            from PyQt6.QtWidgets import QMessageBox, QPushButton
 
-            QMessageBox.warning(
-                None,
-                "模型未下载",
-                f"模型 '{model_id}' 尚未下载。\n请先在 Model Manager 中下载。",
-            )
+            msg = t("model_required_download_msg", model_id=model_id)
+            dlg = QMessageBox(QMessageBox.Icon.Warning, t("model_required_download_title"), msg)
+            btn_open = QPushButton(t("open_model_manager_btn"))
+            dlg.addButton(btn_open, QMessageBox.ButtonRole.AcceptRole)
+            dlg.addButton(QMessageBox.StandardButton.Cancel)
+            dlg.setDefaultButton(btn_open)
+
+            def on_btn_clicked():
+                if dlg.clickedButton() is btn_open:
+                    self._settings_window._on_manage_models()
+                dlg.close()
+
+            btn_open.clicked.connect(on_btn_clicked)
+            dlg.exec()
             return False
 
         return True

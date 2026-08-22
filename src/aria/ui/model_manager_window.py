@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -23,8 +22,8 @@ from PyQt6.QtWidgets import (
 )
 
 from ..i18n import t
-from ..model_manager import ModelInfo, ModelManager, ModelStatus, ModelType
-from ..model_manager.registry import ModelRegistry
+from ..model_manager import ModelManager, ModelStatus
+from ..model_manager.registry import ModelRegistry, ModelSpec
 
 
 class ModelRow(QFrame):
@@ -34,7 +33,7 @@ class ModelRow(QFrame):
 
     def __init__(
         self,
-        model: ModelInfo,
+        model: ModelSpec,
         manager: ModelManager,
         on_status_change: Callable | None = None,
     ):
@@ -69,7 +68,7 @@ class ModelRow(QFrame):
         top_row = QHBoxLayout()
 
         # Model name with emoji if recommended
-        name = t(self.model.name) if self.model.name.startswith("model_name_") else self.model.name
+        name = self.model.display_name
         if "large-v3" in self.model.id and "turbo" not in self.model.id:
             name = "⭐ " + name  # Recommended
 
@@ -88,7 +87,7 @@ class ModelRow(QFrame):
         layout.addLayout(top_row)
 
         # Description
-        desc = t(self.model.description) if self.model.description.startswith("model_desc_") else self.model.description
+        desc = self.model.language
         if desc:
             desc_label = QLabel(desc)
             desc_label.setStyleSheet("color: #aaaaaa; font-size: 12px;")
@@ -273,7 +272,7 @@ class ModelManagerWindow(QDialog):
         scroll_layout.setSpacing(10)
 
         # Streaming models section
-        self._create_model_section(scroll_layout, t("streaming_models"), [ModelType.SHERPA])
+        self._create_model_section(scroll_layout, t("streaming_models"))
 
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
@@ -294,7 +293,7 @@ class ModelManagerWindow(QDialog):
 
         layout.addLayout(footer)
 
-    def _create_model_section(self, parent_layout, title: str, model_types):
+    def _create_model_section(self, parent_layout, title: str):
         """Create a section for a group of models."""
         # Section title
         section_title = QLabel(title)
@@ -304,19 +303,9 @@ class ModelManagerWindow(QDialog):
 
         # Get models from registry
         for spec in self.registry.list():
-            # Create a ModelInfo for compatibility with ModelRow
-            info = ModelInfo(
-                id=spec.id,
-                name=spec.display_name,
-                model_type=ModelType.SHERPA,
-                size_mb=0,
-                description=spec.language,
-                local_folder=spec.id,
-            )
-            if info.model_type in model_types:
-                row = ModelRow(info, self.manager, self._on_status_change)
-                self.model_rows[info.id] = row
-                parent_layout.addWidget(row)
+            row = ModelRow(spec, self.manager, self._on_status_change)
+            self.model_rows[spec.id] = row
+            parent_layout.addWidget(row)
 
     def _on_status_change(self):
         """Called when any model's status changes."""
@@ -334,229 +323,7 @@ class ModelManagerWindow(QDialog):
             subprocess.run(["xdg-open", str(models_dir)])
 
 
-class ModelDownloadDialog(QDialog):
-    """Dialog for downloading missing models."""
-
-    progress_updated = pyqtSignal(str, float, str)
-
-    def __init__(self, parent, models_to_download: list, on_complete: Callable | None = None):
-        super().__init__(parent)
-
-        self.models_to_download = models_to_download
-        self.on_complete = on_complete
-        self.registry = ModelRegistry(Path("models"))
-        self.manager = ModelManager(self.registry)
-        self._completed_count = 0
-        self._destroyed = False
-
-        self.setWindowTitle(t("download_title"))
-        # Dynamic height: base 200 + 140 per model
-        height = 200 + (len(models_to_download) * 140)
-        self.setFixedSize(500, min(height, 600))
-        self.setModal(True)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1a1a1a;
-            }
-            QLabel {
-                color: white;
-            }
-        """)
-
-        self._create_ui()
-        self._start_downloads()
-
-        # Connect signal
-        self.progress_updated.connect(self._update_progress)
-
-    def _create_ui(self):
-        """Create the dialog UI."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
-
-        # Title
-        title = QLabel("📥 " + t("downloading_models"))
-        title.setFont(QFont("", 16, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-
-        # Model progress sections
-        self.progress_widgets = {}
-
-        for model in self.models_to_download:
-            frame = QFrame()
-            frame.setMinimumHeight(110)
-            frame.setStyleSheet("""
-                QFrame {
-                    background-color: #2a2a2a;
-                    border-radius: 8px;
-                }
-            """)
-            frame_layout = QVBoxLayout(frame)
-            frame_layout.setContentsMargins(15, 15, 15, 15)
-            frame_layout.setSpacing(8)
-
-            name = t(model.name) if model.name.startswith("model_name_") else model.name
-            name_label = QLabel(f"{name} ({model.get_size_display()})")
-            name_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold;")
-            name_label.setMinimumHeight(22)
-            frame_layout.addWidget(name_label)
-
-            progress_bar = QProgressBar()
-            progress_bar.setMaximum(100)
-            progress_bar.setMinimumHeight(20)
-            progress_bar.setStyleSheet("""
-                QProgressBar {
-                    background-color: #444444;
-                    border-radius: 4px;
-                }
-                QProgressBar::chunk {
-                    background-color: #3B8ED0;
-                    border-radius: 4px;
-                }
-            """)
-            frame_layout.addWidget(progress_bar)
-
-            status_label = QLabel(t("download_waiting"))
-            status_label.setStyleSheet("color: #888888; font-size: 11px;")
-            status_label.setMinimumHeight(18)
-            frame_layout.addWidget(status_label)
-
-            progress_note = QLabel(t("download_progress_note"))
-            progress_note.setStyleSheet("color: #666666; font-size: 10px;")
-            progress_note.setMinimumHeight(16)
-            frame_layout.addWidget(progress_note)
-
-            layout.addWidget(frame)
-
-            self.progress_widgets[model.id] = {
-                "progress_bar": progress_bar,
-                "status_label": status_label,
-            }
-
-        layout.addStretch()
-
-        # Cancel button (enabled during download)
-        self.cancel_button = QPushButton(t("cancel_download"))
-        self.cancel_button.setEnabled(True)
-        self.cancel_button.clicked.connect(self._on_close)
-        self.cancel_button.setStyleSheet("""
-            QPushButton {
-                background-color: #555555;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px;
-            }
-            QPushButton:hover {
-                background-color: #666666;
-            }
-        """)
-        layout.addWidget(self.cancel_button)
-
-    def _start_downloads(self):
-        """Start downloading all models."""
-        for model in self.models_to_download:
-
-            def make_callback(m):
-                return lambda mid, prog, status: self.progress_updated.emit(m.id, prog, status)
-
-            self.manager.download(model, make_callback(model))
-
-    def _update_progress(self, model_id: str, progress: float, status_text: str):
-        """Update progress for a model."""
-        if self._destroyed or model_id not in self.progress_widgets:
-            return
-
-        widgets = self.progress_widgets[model_id]
-        widgets["progress_bar"].setValue(int(progress * 100))
-        widgets["status_label"].setText(status_text)
-
-        if progress >= 1.0:
-            self._completed_count += 1
-            self._check_all_complete()
-
-    def _check_all_complete(self):
-        """Check if all downloads are complete."""
-        if self._completed_count >= len(self.models_to_download):
-            self.cancel_button.setText(t("close"))
-            self.cancel_button.setStyleSheet("""
-                QPushButton {
-                    background-color: #3B8ED0;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    padding: 12px;
-                }
-                QPushButton:hover {
-                    background-color: #4B9EE0;
-                }
-            """)
-
-    def _on_close(self):
-        """Handle dialog close."""
-        # Check if any download is still in progress
-        if self._completed_count < len(self.models_to_download):
-            result = QMessageBox.question(
-                self,
-                t("download_in_progress"),
-                t("download_cancel_confirm"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if result != QMessageBox.StandardButton.Yes:
-                return
-
-            # User confirmed cancel - delete partial downloaded models and force quit
-            import shutil
-
-            for model in self.models_to_download:
-                model_path = self.manager.get_model_path(model)
-                if model_path and model_path.exists():
-                    try:
-                        if model_path.is_dir():
-                            shutil.rmtree(model_path)
-                        else:
-                            os.remove(model_path)
-                    except Exception:
-                        pass
-
-                # Also try to clear HuggingFace cache
-                if model.hf_repo:
-                    try:
-                        hf_cache = os.path.expanduser("~/.cache/huggingface/hub")
-                        repo_name = model.hf_repo.replace("/", "--")
-                        for entry in os.listdir(hf_cache):
-                            if repo_name in entry:
-                                cache_path = os.path.join(hf_cache, entry)
-                                if os.path.isdir(cache_path):
-                                    shutil.rmtree(cache_path)
-                    except Exception:
-                        pass
-
-            # Force exit
-            os._exit(0)
-
-        self._destroyed = True
-        self.accept()
-
-    def closeEvent(self, event):
-        """Handle window close."""
-        if self._destroyed:
-            event.accept()
-            return
-
-        event.ignore()
-        self._on_close()
-
-
 def show_model_manager(parent=None):
     """Show the model manager window."""
     dialog = ModelManagerWindow(parent)
-    dialog.exec()
-
-
-def show_download_dialog(parent, models_to_download: list, on_complete=None):
-    """Show the download dialog for specific models."""
-    dialog = ModelDownloadDialog(parent, models_to_download, on_complete)
     dialog.exec()

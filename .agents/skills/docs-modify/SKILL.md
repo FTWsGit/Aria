@@ -1,6 +1,6 @@
 ---
 name: docs-modify
-description: ARIA 项目的 docs 文档同步纪律。本轮任务真的发生了代码改动，`uv run ruff check .` 通过之后，需要修改文档时使用。
+description: ARIA 项目的 docs 文档同步纪律。本轮任务真的发生了代码改动，`uv run pytest` 通过之后，需要修改文档时使用。
 ---
 
 # 文档同步纪律

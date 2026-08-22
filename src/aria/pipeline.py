@@ -14,7 +14,7 @@ import numpy as np
 
 from .audio.capture import AudioCapture
 from .events import SubtitleEvent
-from .logger import debug, info, transcript, warning
+from .logger import debug, exception, info, transcript, warning
 
 # Import ASR backends and model registry
 from .model_manager.manager import ModelManager
@@ -25,10 +25,10 @@ from .transcription.whisper_http import WhisperHttpBackend
 
 # Translation support (optional)
 try:
-    from .translation.translator import GOOGLETRANS_AVAILABLE, TRANSLATORS_AVAILABLE, create_translator
+    from .translation.translator import create_translator
 
-    TRANSLATION_AVAILABLE = TRANSLATORS_AVAILABLE or GOOGLETRANS_AVAILABLE
-    debug(f"Translation module loaded, TRANSLATORS={TRANSLATORS_AVAILABLE}, GOOGLE={GOOGLETRANS_AVAILABLE}")
+    TRANSLATION_AVAILABLE = True
+    debug("Translation module loaded")
 except ImportError as e:
     warning(f"Translation import failed: {e}")
     TRANSLATION_AVAILABLE = False
@@ -52,12 +52,16 @@ class StreamingPipeline:
     - Chunked mode: accumulate audio then transcribe chunks (whisper-http).
     """
 
+    # Max consecutive failures before escalating to fatal error
+    MAX_CONSECUTIVE_FAILURES = 5
+
     def __init__(
         self,
         model_id: str,
         registry: ModelRegistry,
         model_manager: ModelManager,
         on_subtitle: Callable[[SubtitleEvent], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
         max_lines: int = 4,
         # Translation settings
         enable_translation: bool = False,
@@ -87,6 +91,7 @@ class StreamingPipeline:
             audio_source: "system" or "mic:..." for microphone
         """
         self.on_subtitle = on_subtitle or self._default_callback
+        self._on_error = on_error
         self.max_lines = max_lines
         self.enable_translation = enable_translation
         self.translation_engine = translation_engine
@@ -152,6 +157,11 @@ class StreamingPipeline:
         self._text_lock = threading.Lock()
         self._translation_thread: threading.Thread | None = None
 
+        # Failure tracking
+        self._consecutive_asr_failures: int = 0
+        self._consecutive_translation_failures: int = 0
+        self._asr_fatal: bool = False
+
         trans_status = "enabled (incremental)" if self._state_manager else "disabled"
         info(f"StreamingPipeline: mode={self._mode}, backend={spec.backend}, translation={trans_status}")
 
@@ -174,24 +184,39 @@ class StreamingPipeline:
             except queue.Empty:
                 continue
 
-            # Dispatch by mode
-            if self._mode == "streaming":
-                raw_text = self._transcriber.process_audio(audio)
-            elif self._mode == "chunked":
-                self._chunk_buffer.append(audio)
-                self._chunk_samples += len(audio)
+            # Dispatch by mode, wrapped in try/except for resilience
+            try:
+                if self._mode == "streaming":
+                    raw_text = self._transcriber.process_audio(audio)
+                elif self._mode == "chunked":
+                    self._chunk_buffer.append(audio)
+                    self._chunk_samples += len(audio)
 
-                chunk_seconds = getattr(self._transcriber, "chunk_seconds", 2.0)
-                chunk_samples_needed = int(16000 * chunk_seconds)
-                if self._chunk_samples < chunk_samples_needed:
-                    continue
+                    chunk_seconds = getattr(self._transcriber, "chunk_seconds", 2.0)
+                    chunk_samples_needed = int(16000 * chunk_seconds)
+                    if self._chunk_samples < chunk_samples_needed:
+                        continue
 
-                combined = np.concatenate(self._chunk_buffer)
-                self._chunk_buffer = []
-                self._chunk_samples = 0
-                raw_text = self._transcriber.transcribe(combined, 16000)
-            else:
-                raw_text = ""
+                    combined = np.concatenate(self._chunk_buffer)
+                    self._chunk_buffer = []
+                    self._chunk_samples = 0
+                    raw_text = self._transcriber.transcribe(combined, 16000)
+                else:
+                    raw_text = ""
+
+                # Reset failure counter on success
+                self._consecutive_asr_failures = 0
+
+            except Exception:
+                self._consecutive_asr_failures += 1
+                exception(f"ASR backend error ({self._consecutive_asr_failures}/{self.MAX_CONSECUTIVE_FAILURES})")
+                if self._consecutive_asr_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                    self._asr_fatal = True
+                    if self._on_error:
+                        self._on_error("error_asr_backend_failed")
+                    break
+                # Single failure: skip this chunk, continue
+                continue
 
             # Check for changes to avoid redundant updates
             if not raw_text or raw_text == self._latest_raw_text:
@@ -224,6 +249,7 @@ class StreamingPipeline:
         Consumes latest raw text, blocks on network calls.
         Conflates updates (skips intermediate frames if falling behind).
         """
+        _translation_error_reported = False
         while self._running:
             if not self._new_text_event.wait(timeout=0.1):
                 continue
@@ -255,8 +281,22 @@ class StreamingPipeline:
                 )
                 self.on_subtitle(event)
 
-            except Exception as e:
-                warning(f"StreamingPipeline: Translation error: {e}")
+                # Reset failure counter on success
+                self._consecutive_translation_failures = 0
+                _translation_error_reported = False
+
+            except Exception:
+                self._consecutive_translation_failures += 1
+                exception(
+                    f"Translation error ({self._consecutive_translation_failures}/{self.MAX_CONSECUTIVE_FAILURES})"
+                )
+                if (
+                    self._consecutive_translation_failures >= self.MAX_CONSECUTIVE_FAILURES
+                    and not _translation_error_reported
+                    and self._on_error
+                ):
+                    self._on_error("error_translation_unavailable")
+                    _translation_error_reported = True
 
     def start(self) -> None:
         """Start the streaming pipeline."""

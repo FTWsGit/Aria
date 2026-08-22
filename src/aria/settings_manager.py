@@ -31,7 +31,7 @@ class SettingsManager:
 
     def __init__(self):
         """Initialize settings manager."""
-        self._config_dir = Path.home() / ".config" / "realtime-subtitles"
+        self._config_dir = Path.home() / ".config" / "aria"
         self._config_file = self._config_dir / "settings.json"
         self._settings = self.DEFAULT_SETTINGS.copy()
         self._load()

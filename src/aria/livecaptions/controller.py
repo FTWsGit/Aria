@@ -98,7 +98,7 @@ class LiveCaptionsController:
                     if window.Exists(0, 0):
                         info("LiveCaptionsController: LiveCaptions window found")
                         return True
-                except:
+                except Exception:
                     pass
 
             # Even if verification fails, return success (may have launched but positioning failed)
@@ -147,7 +147,7 @@ class LiveCaptionsController:
                         window.MoveWindow(screen_width - 50, screen_height - 50, 1, 1)
                         debug("LiveCaptionsController: Window moved to corner")
                         return True
-                    except:
+                    except Exception:
                         pass
 
                 warning("LiveCaptionsController: Window not found for minimizing")
@@ -216,7 +216,7 @@ class LiveCaptionsController:
                     x = (screen_width - 600) // 2
                     y = screen_height - 200
                     window.MoveWindow(x, y, 600, 150)
-                except:
+                except Exception:
                     # If unable to get screen size, move to fixed position
                     window.MoveWindow(500, 800, 600, 150)
 
@@ -243,7 +243,7 @@ class LiveCaptionsController:
         try:
             window = auto.WindowControl(searchDepth=1, ClassName="LiveCaptionsDesktopWindow")
             return window.Exists(0, 0)
-        except:
+        except Exception:
             return False
 
 

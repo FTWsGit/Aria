@@ -61,6 +61,6 @@ AudioCapture → PCM chunks → StreamingPipeline (按 kind 分发)
 ```powershell
 uv venv && uv sync          # 安装
 uv run aria                  # 运行
-uv run ruff check .          # 检查
+uv run ruff check --fix          # 检查
 uv run pytest                # 测试
 ```
