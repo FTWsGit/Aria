@@ -1,6 +1,6 @@
 # ARIA v2
 
-[中文說明 / Chinese version](README_ch.md)
+[中文說明 / Chinese version](README_zh.md)
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg" alt="Windows">
