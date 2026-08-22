@@ -20,6 +20,7 @@ class ModelSpec:
     display_name: str
     language: str
     source: dict
+    size_mb: int = 0
     params: dict = field(default_factory=dict)
     raw: dict = field(default_factory=dict)
 
@@ -41,6 +42,7 @@ class ModelRegistry:
                 display_name=data.get("display_name", data["id"]),
                 language=data.get("language", "unknown"),
                 source=data.get("source", {}),
+                size_mb=data.get("size_mb", 0),
                 params=data.get("params", {}),
                 raw=data,
             )

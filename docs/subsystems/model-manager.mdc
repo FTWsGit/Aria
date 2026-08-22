@@ -15,7 +15,7 @@ alwaysApply: false
 
 `ModelRegistry(models_dir)` 扫描 `models/*.yaml`，构建 `ModelSpec` 索引：
 
-- `ModelSpec` 包含 `id`、`kind`（`asr_streaming` / `asr_chunked`）、`backend`、`display_name`、`language`、`source`、`params`、`raw`
+- `ModelSpec` 包含 `id`、`kind`（`asr_streaming` / `asr_chunked`）、`backend`、`display_name`、`language`、`size_mb`、`source`、`params`、`raw`
 - `list(kind)` 按类型筛选，`get(model_id)` 按 ID 获取
 - 绝不触发下载
 

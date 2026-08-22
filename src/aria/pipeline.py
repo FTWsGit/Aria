@@ -142,6 +142,10 @@ class StreamingPipeline:
         self._audio_queue: queue.Queue = queue.Queue()
         self._process_thread: threading.Thread | None = None
 
+        # Chunked mode buffer
+        self._chunk_buffer: list = []
+        self._chunk_samples = 0
+
         # Async Conflation State (buffering ASR while translating)
         self._latest_raw_text: str = ""
         self._new_text_event = threading.Event()
@@ -174,9 +178,6 @@ class StreamingPipeline:
             if self._mode == "streaming":
                 raw_text = self._transcriber.process_audio(audio)
             elif self._mode == "chunked":
-                if not hasattr(self, "_chunk_buffer"):
-                    self._chunk_buffer = []
-                    self._chunk_samples = 0
                 self._chunk_buffer.append(audio)
                 self._chunk_samples += len(audio)
 

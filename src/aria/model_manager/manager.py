@@ -379,6 +379,9 @@ class ModelManager:
         if callback:
             callback(model.id, 0.05, t("download_status_downloading").format(name=model.display_name))
 
+        if callback:
+            callback(model.id, 0.06, "下载中，请稍候...")
+
         kwargs = {"local_dir": str(local_dir), "local_dir_use_symlinks": False}
         if files:
             kwargs["allow_patterns"] = files
@@ -405,6 +408,9 @@ class ModelManager:
 
         if callback:
             callback(model.id, 0.05, t("download_status_downloading").format(name=model.display_name))
+
+        if callback:
+            callback(model.id, 0.06, "下载中，请稍候...")
 
         kwargs = {"local_dir": str(local_dir)}
         if files:
@@ -486,7 +492,7 @@ class ModelManager:
                 id=spec.id,
                 name=spec.display_name,
                 model_type=ModelType.SHERPA,
-                size_mb=0,
+                size_mb=spec.size_mb,
                 description=spec.language,
                 local_folder=spec.id,
             )
