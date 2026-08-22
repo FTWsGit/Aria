@@ -6,7 +6,6 @@ Saves and loads user settings to a JSON file.
 
 import json
 from pathlib import Path
-from typing import Optional
 
 
 class SettingsManager:
@@ -22,6 +21,12 @@ class SettingsManager:
         "timezone": "system",
         "overlay_visible": True,
         "console_mode": "verbose",
+        "openai_endpoint": "http://127.0.0.1:1234/v1",
+        "openai_api_key": "",
+        "openai_model_name": "",
+        "openai_temperature": 0.2,
+        "openai_max_tokens": 1024,
+        "openai_system_prompt": "",
     }
     
     def __init__(self):
@@ -79,7 +84,7 @@ class SettingsManager:
 
 
 # Global instance
-_instance: Optional[SettingsManager] = None
+_instance: SettingsManager | None = None
 
 
 def get_settings_manager() -> SettingsManager:

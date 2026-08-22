@@ -3,11 +3,11 @@ Model Manager - Handles model downloading and status checking.
 """
 
 import os
+import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable, Dict, List
-import threading
 
 from ..i18n import t
 
@@ -15,7 +15,6 @@ from ..i18n import t
 class ModelType(Enum):
     """Types of models supported."""
     SHERPA = "sherpa"
-    NLLB = "nllb"
 
 
 class ModelStatus(Enum):
@@ -35,10 +34,10 @@ class ModelInfo:
     size_mb: int
     description: str
     # Download source
-    hf_repo: Optional[str] = None  # Hugging Face repo ID
-    download_url: Optional[str] = None  # Direct download URL
+    hf_repo: str | None = None  # Hugging Face repo ID
+    download_url: str | None = None  # Direct download URL
     # Local paths
-    local_folder: Optional[str] = None  # Folder name in models directory
+    local_folder: str | None = None  # Folder name in models directory
     
     def get_size_display(self) -> str:
         """Get human-readable size string."""
@@ -49,8 +48,7 @@ class ModelInfo:
 
 # Registry of all supported models
 # Note: name_key and desc_key are i18n translation keys
-SUPPORTED_MODELS: List[ModelInfo] = [
-    # Sherpa-ONNX models
+SUPPORTED_MODELS: list[ModelInfo] = [
     ModelInfo(
         id="sherpa-onnx-streaming-paraformer-zh",
         name="model_name_sherpa",
@@ -58,23 +56,13 @@ SUPPORTED_MODELS: List[ModelInfo] = [
         size_mb=500,
         description="model_desc_sherpa",
     ),
-    # NLLB translation model
-    ModelInfo(
-        id="nllb-200-distilled-600M",
-        name="model_name_nllb",
-        model_type=ModelType.NLLB,
-        size_mb=600,
-        description="model_desc_nllb",
-        hf_repo="JustFrederik/nllb-200-distilled-600M-ct2-int8",
-        local_folder="nllb-200-distilled-600M-ct2-int8",
-    ),
 ]
 
 
 class ModelManager:
     """Manages model downloading and status."""
     
-    def __init__(self, models_dir: Optional[Path] = None):
+    def __init__(self, models_dir: Path | None = None):
         """
         Initialize the model manager.
         
@@ -85,9 +73,9 @@ class ModelManager:
         self.models_dir.mkdir(parents=True, exist_ok=True)
         
         # Download state
-        self._download_progress: Dict[str, float] = {}
-        self._download_threads: Dict[str, threading.Thread] = {}
-        self._download_callbacks: Dict[str, Callable[[str, float, str], None]] = {}
+        self._download_progress: dict[str, float] = {}
+        self._download_threads: dict[str, threading.Thread] = {}
+        self._download_callbacks: dict[str, Callable[[str, float, str], None]] = {}
     
     @staticmethod
     def _get_default_models_dir() -> Path:
@@ -135,7 +123,7 @@ class ModelManager:
     def download(
         self,
         model: ModelInfo,
-        progress_callback: Optional[Callable[[str, float, str], None]] = None,
+        progress_callback: Callable[[str, float, str], None] | None = None,
     ) -> None:
         """
         Start downloading a model in background.
@@ -184,7 +172,7 @@ class ModelManager:
     def _download_from_huggingface(
         self,
         model: ModelInfo,
-        callback: Optional[Callable[[str, float, str], None]],
+        callback: Callable[[str, float, str], None] | None,
     ) -> None:
         """Download model from Hugging Face Hub."""
         try:
@@ -259,13 +247,13 @@ class ModelManager:
     def _download_from_url(
         self,
         model: ModelInfo,
-        callback: Optional[Callable[[str, float, str], None]],
+        callback: Callable[[str, float, str], None] | None,
     ) -> None:
         """Download model from direct URL."""
-        import urllib.request
-        import tempfile
-        import zipfile
         import tarfile
+        import tempfile
+        import urllib.request
+        import zipfile
         
         model_path = self.get_model_path(model)
         url = model.download_url
@@ -337,10 +325,10 @@ class ModelManager:
                 print(f"[ModelManager] Delete error: {e}")
         return False
     
-    def get_all_models(self) -> List[ModelInfo]:
+    def get_all_models(self) -> list[ModelInfo]:
         """Get list of all supported models."""
         return SUPPORTED_MODELS.copy()
     
-    def get_models_by_type(self, model_type: ModelType) -> List[ModelInfo]:
+    def get_models_by_type(self, model_type: ModelType) -> list[ModelInfo]:
         """Get models of a specific type."""
         return [m for m in SUPPORTED_MODELS if m.model_type == model_type]

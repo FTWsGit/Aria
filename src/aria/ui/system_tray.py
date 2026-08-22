@@ -6,7 +6,8 @@ when the main window is minimized.
 """
 
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
+
 import pystray
 from PIL import Image, ImageDraw
 
@@ -40,9 +41,9 @@ class SystemTray:
         self.on_toggle = on_toggle
         self.on_quit = on_quit
         
-        self._icon: Optional[pystray.Icon] = None
+        self._icon: pystray.Icon | None = None
         self._is_running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
     
     def _create_icon_image(self, color: str = "#3B8ED0") -> Image.Image:
         """

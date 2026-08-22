@@ -3,9 +3,9 @@ Windows LiveCaptions Monitor
 Captures real-time subtitle text using UI Automation
 """
 
-import time
 import threading
-from typing import Optional, Callable
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 try:
@@ -15,7 +15,7 @@ except ImportError:
     UIAUTOMATION_AVAILABLE = False
     auto = None
 
-from ..logger import info, debug, warning, error
+from ..logger import debug, error, info, warning
 
 
 @dataclass
@@ -62,7 +62,7 @@ class LiveCaptionsMonitor:
     
     def __init__(
         self,
-        on_caption: Optional[Callable[[CaptionEvent], None]] = None,
+        on_caption: Callable[[CaptionEvent], None] | None = None,
         poll_interval: float = 0.1,  # 100ms polling interval
     ):
         """
@@ -82,13 +82,13 @@ class LiveCaptionsMonitor:
         self.poll_interval = poll_interval
         
         self._running = False
-        self._monitor_thread: Optional[threading.Thread] = None
+        self._monitor_thread: threading.Thread | None = None
         self._last_text = ""
-        self._caption_element: Optional[auto.Control] = None
+        self._caption_element: auto.Control | None = None
         
         info("LiveCaptionsMonitor: Initialized")
     
-    def _find_livecaptions_window(self) -> Optional[auto.WindowControl]:
+    def _find_livecaptions_window(self) -> auto.WindowControl | None:
         """Find the LiveCaptions window"""
         try:
             window = auto.WindowControl(
@@ -106,10 +106,10 @@ class LiveCaptionsMonitor:
                     return window
             return None
             
-        except Exception as e:
+        except Exception:
             return None
     
-    def _find_caption_element(self, window: auto.WindowControl) -> Optional[auto.Control]:
+    def _find_caption_element(self, window: auto.WindowControl) -> auto.Control | None:
         """
         Find the caption text element in LiveCaptions window
         """
@@ -254,7 +254,7 @@ class LiveCaptionsMonitor:
                             self.on_caption(event)
                             self._last_text = current_text
                         elif is_initial_text:
-                            debug(f"LiveCaptionsMonitor: Skipping initial placeholder")
+                            debug("LiveCaptionsMonitor: Skipping initial placeholder")
                             self._last_text = current_text
                         else:
                             # Empty text - just update last_text without sending event

@@ -21,7 +21,7 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 |---|---|
 | `src/aria/audio/` | Windows WASAPI 音频捕获 |
 | `src/aria/transcription/` | ASR 后端（仅 Sherpa-ONNX） |
-| `src/aria/translation/` | 翻译提供者（NLLB / Google / Bing / Youdao） |
+| `src/aria/translation/` | 翻译提供者（Google / Bing / Youdao / OpenAI-compatible） |
 | `src/aria/ui/` | PyQt6 窗口、悬浮窗、设置、托盘 |
 | `src/aria/livecaptions/` | Windows 内建字幕集成 |
 | `src/aria/model_manager/` | 模型发现/下载/配置 |

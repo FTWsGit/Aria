@@ -14,7 +14,6 @@ alwaysApply: false
 ## 模型类型
 
 - `ModelType.SHERPA`：Sherpa-ONNX ASR 模型
-- `ModelType.NLLB`：NLLB 翻译模型
 
 ## 下载方式
 
@@ -25,5 +24,4 @@ alwaysApply: false
 
 - 模型文件放在项目根目录 `models/` 下
 - Sherpa 模型不硬编码 URL——用户自行管理
-- NLLB 模型通过 `ModelManager.download()` 下载
-- 下载在后台线程执行，通过回调通知进度
+- 翻译模型不再由 Aria 管理——用户自行在外部起 LLM server 或使用在线机翻

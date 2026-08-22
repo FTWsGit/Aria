@@ -21,8 +21,9 @@ def main():
     cmd = sys.argv[1]
 
     if cmd == "list":
-        from parse_docs import list_docs
         import json
+
+        from parse_docs import list_docs
         directory = "docs"
         for i, arg in enumerate(sys.argv[2:]):
             if arg == "--dir" and i + 1 < len(sys.argv[2:]):

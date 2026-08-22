@@ -4,18 +4,15 @@ Floating Subtitle Overlay Window using PyQt6.
 A transparent, always-on-top, draggable window that displays subtitles.
 """
 
-from PyQt6.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QApplication, QSizeGrip, QFrame, QTextEdit
-)
-from PyQt6.QtCore import Qt, QPoint, QTimer
-from PyQt6.QtGui import QFont, QColor, QPalette, QScreen, QPainter
-from typing import Optional, Callable
 import sys
+from collections.abc import Callable
 
-import ctypes
-from ctypes.wintypes import POINT
+from PyQt6.QtCore import QPoint, Qt, QTimer
+from PyQt6.QtGui import QColor, QPainter
+from PyQt6.QtWidgets import QApplication, QFrame, QTextEdit, QVBoxLayout, QWidget
 
 from aria.settings_manager import get_settings_manager
+
 
 class SubtitleOverlay(QWidget):
     """
@@ -34,9 +31,9 @@ class SubtitleOverlay(QWidget):
     
     def __init__(
         self,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
         position_key: str = "overlay",
-        on_close: Optional[Callable] = None,
+        on_close: Callable | None = None,
     ):
         """Initialize the overlay window."""
         super().__init__(parent)
@@ -45,8 +42,8 @@ class SubtitleOverlay(QWidget):
         self._on_close_callback = on_close
         
         # Drag/Resize state
-        self._drag_pos: Optional[QPoint] = None
-        self._resize_edge: Optional[int] = None
+        self._drag_pos: QPoint | None = None
+        self._resize_edge: int | None = None
         self._initial_geometry = None
         
         # Window dimensions

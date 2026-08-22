@@ -13,18 +13,20 @@ alwaysApply: false
 
 ## 翻译引擎
 
+Aria 不管理任何翻译模型权重。LLM 由用户自行在外部起 server 或填 API key。
+
 | 引擎 | 实现 | 特点 |
 |---|---|---|
-| NLLB | `NLLBTranslator` (CTranslate2) | 本地离线，NLLB-200 600M int8 |
 | Google | `GoogleTranslator` (googletrans) | 在线免费 |
 | Bing | `TranslatorsLibWrapper` | 在线 |
 | Youdao | `TranslatorsLibWrapper` | 仅中英互译 |
+| OpenAI-compatible | `OpenAITranslator` (openai) | 支持本地 llama-server、vLLM、ollama、DeepSeek、OpenAI 等 |
 
 ## 工厂函数
 
 ```python
-translator = create_translator(engine="nllb", target_language="zho_Hant")
-result = translator.translate("hello", source_language="en")
+translator = create_translator(engine="bing", target_language="zho_Hant")
+result = translator.translate("hello")
 ```
 
 ## TranslationStateManager
@@ -37,9 +39,7 @@ result = translator.translate("hello", source_language="en")
 
 ## 依赖
 
-- `ctranslate2`：NLLB 推理
-- `sentencepiece`：NLLB tokenizer
-- `huggingface_hub`：NLLB 模型下载
+- `openai`：OpenAI-compatible HTTP client
 - `googletrans`：Google 翻译（可选）
 - `translators`：Bing/Youdao（可选）
 
@@ -48,3 +48,4 @@ result = translator.translate("hello", source_language="en")
 - 翻译独立于 ASR，可单独开关
 - 引擎不可用时静默降级，不抛异常
 - 翻译在后台线程执行，不阻塞 ASR
+- Aria 不下载、不缓存、不管理任何翻译模型权重

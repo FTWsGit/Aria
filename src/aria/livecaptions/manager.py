@@ -9,9 +9,9 @@ Simplified logic:
 """
 
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import List, Tuple, Optional, Callable
-from dataclasses import dataclass, field
 
 # Import logger - use try/except for standalone testing
 try:
@@ -63,7 +63,7 @@ class TranslationStateManager:
     
     def __init__(
         self,
-        translator: Optional[Callable[[str], str]] = None,
+        translator: Callable[[str], str] | None = None,
     ):
         """
         Initialize the manager.
@@ -74,11 +74,11 @@ class TranslationStateManager:
         self.translator = translator
         
         # Committed state
-        self._committed_sources: List[str] = []    # Source sentences that are locked
-        self._committed_paragraphs: List[str] = [] # Translation paragraphs (each commit batch = 1 paragraph)
+        self._committed_sources: list[str] = []    # Source sentences that are locked
+        self._committed_paragraphs: list[str] = [] # Translation paragraphs (each commit batch = 1 paragraph)
         
         # Draft state (volatile, overwritten each update)
-        self._draft_sources: List[str] = []        # Source sentences pending
+        self._draft_sources: list[str] = []        # Source sentences pending
         self._draft_translation: str = ""          # Translation of draft sources
         self._last_processed_text: str = ""        # Cache for duplicate detection
     
@@ -152,7 +152,7 @@ class TranslationStateManager:
         
         return self._build_state()
     
-    def _segment_sentences(self, text: str) -> List[str]:
+    def _segment_sentences(self, text: str) -> list[str]:
         """Split text into sentences."""
         if not text:
             return []
@@ -177,7 +177,7 @@ class TranslationStateManager:
         
         return sentences
     
-    def _find_committed_end(self, source_sentences: List[str]) -> int:
+    def _find_committed_end(self, source_sentences: list[str]) -> int:
         """
         Find where committed content ends in the source sentences.
         

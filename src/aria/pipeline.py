@@ -6,25 +6,26 @@ Audio flows directly from capture → Sherpa → partial results → UI.
 No VAD, no segmentation, no multi-backend routing.
 """
 
-import threading
 import queue
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Optional, Callable
+
 import numpy as np
 
 from .audio.capture import AudioCapture
 from .events import SubtitleEvent
-from .logger import info, debug, warning, error, transcript
+from .logger import debug, info, transcript, warning
 
 # Import Sherpa transcriber
-from .transcription.sherpa_transcriber import SherpaTranscriber, SHERPA_AVAILABLE
+from .transcription.sherpa_transcriber import SHERPA_AVAILABLE, SherpaTranscriber
 
 # Translation support (optional)
 try:
-    from .translation.translator import create_translator, CTRANSLATE2_AVAILABLE, GOOGLETRANS_AVAILABLE
-    TRANSLATION_AVAILABLE = CTRANSLATE2_AVAILABLE or GOOGLETRANS_AVAILABLE
-    debug(f"Translation module loaded, CTRANSLATE2={CTRANSLATE2_AVAILABLE}, GOOGLE={GOOGLETRANS_AVAILABLE}")
+    from .translation.translator import GOOGLETRANS_AVAILABLE, TRANSLATORS_AVAILABLE, create_translator
+    TRANSLATION_AVAILABLE = TRANSLATORS_AVAILABLE or GOOGLETRANS_AVAILABLE
+    debug(f"Translation module loaded, TRANSLATORS={TRANSLATORS_AVAILABLE}, GOOGLE={GOOGLETRANS_AVAILABLE}")
 except ImportError as e:
     warning(f"Translation import failed: {e}")
     TRANSLATION_AVAILABLE = False
@@ -34,7 +35,7 @@ except ImportError as e:
 from .livecaptions.manager import TranslationStateManager
 
 
-def _discover_model_paths(model_dir: Optional[str] = None) -> tuple:
+def _discover_model_paths(model_dir: str | None = None) -> tuple:
     """Discover Sherpa model files in the given directory.
 
     Looks for files matching *encoder*.onnx, *decoder*.onnx, *joiner*.onnx, tokens.txt.
@@ -88,18 +89,25 @@ class StreamingPipeline:
 
     def __init__(
         self,
-        encoder: Optional[str] = None,
-        decoder: Optional[str] = None,
-        joiner: Optional[str] = None,
-        tokens: Optional[str] = None,
-        model_dir: Optional[str] = None,
-        on_subtitle: Optional[Callable[[SubtitleEvent], None]] = None,
+        encoder: str | None = None,
+        decoder: str | None = None,
+        joiner: str | None = None,
+        tokens: str | None = None,
+        model_dir: str | None = None,
+        on_subtitle: Callable[[SubtitleEvent], None] | None = None,
         max_lines: int = 4,
         # Translation settings
         enable_translation: bool = False,
         translation_engine: str = "google",
         target_language: str = "zh",
         audio_source: str = "system",
+        # OpenAI translator settings
+        openai_endpoint: str = "http://127.0.0.1:1234/v1",
+        openai_api_key: str = "",
+        openai_model_name: str = "",
+        openai_temperature: float = 0.2,
+        openai_max_tokens: int = 1024,
+        openai_system_prompt: str = "",
     ):
         """
         Initialize the streaming pipeline.
@@ -113,7 +121,7 @@ class StreamingPipeline:
             on_subtitle: Callback for subtitle events
             max_lines: Maximum lines to display
             enable_translation: Whether to enable translation
-            translation_engine: "google", "nllb", "bing", or "youdao"
+            translation_engine: "google", "bing", "youdao", or "openai"
             target_language: Target language for translation
             audio_source: "system" or "mic:..." for microphone
         """
@@ -147,6 +155,12 @@ class StreamingPipeline:
                 self._translator = create_translator(
                     engine=translation_engine,
                     target_language=target_language,
+                    openai_endpoint=openai_endpoint,
+                    openai_api_key=openai_api_key,
+                    openai_model_name=openai_model_name,
+                    openai_temperature=openai_temperature,
+                    openai_max_tokens=openai_max_tokens,
+                    openai_system_prompt=openai_system_prompt,
                 )
                 self._state_manager = TranslationStateManager(
                     translator=self._translator.translate
@@ -163,13 +177,13 @@ class StreamingPipeline:
         # State
         self._running = False
         self._audio_queue: queue.Queue = queue.Queue()
-        self._process_thread: Optional[threading.Thread] = None
+        self._process_thread: threading.Thread | None = None
 
         # Async Conflation State (buffering ASR while translating)
         self._latest_raw_text: str = ""
         self._new_text_event = threading.Event()
         self._text_lock = threading.Lock()
-        self._translation_thread: Optional[threading.Thread] = None
+        self._translation_thread: threading.Thread | None = None
 
         trans_status = "enabled (incremental)" if self._state_manager else "disabled"
         info(f"StreamingPipeline: Sherpa-ONNX, translation={trans_status}")

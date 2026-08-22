@@ -24,7 +24,7 @@ TRANSLATIONS = {
     "engine": "Engine",
     "target_lang": "Target",
     "engine_google": "Google Cloud",
-    "engine_nllb": "NLLB Local",
+    
     
     # Model settings
     "model_settings": "Model Settings",
@@ -100,6 +100,7 @@ TRANSLATIONS = {
     "engine_google_free": "Google",
     "engine_baidu": "Baidu Translate",
     "engine_youdao": "Youdao (CN↔EN only)",
+    "engine_openai": "OpenAI-compatible",
     "engine_bing": "Bing",
     "engine_alibaba": "Alibaba Translate",
     "translation_disclaimer": "",
@@ -121,12 +122,12 @@ TRANSLATIONS = {
     # Model manager - model names
     "model_name_sherpa_zh_en": "Sherpa-ONNX",
     
-    "model_name_nllb": "NLLB Translation",
+    
     
     # Model manager - descriptions
     "model_desc_sherpa_zh_en": "Streaming speech recognition",
     
-    "model_desc_nllb": "Offline multilingual translation (600M)",
+    
     
     # Download status messages
     "download_status_downloading": "Downloading {name}...",

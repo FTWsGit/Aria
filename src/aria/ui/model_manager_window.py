@@ -2,19 +2,27 @@
 Model Manager Window using PyQt6.
 """
 
-from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QProgressBar, QScrollArea, QFrame, QMessageBox, QApplication
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QFont
-from typing import Optional, Dict, Callable
-import threading
 import os
 import subprocess
+from collections.abc import Callable
 
-from ..model_manager import ModelManager, ModelInfo, ModelType, ModelStatus
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ..i18n import t
+from ..model_manager import ModelInfo, ModelManager, ModelStatus, ModelType
 
 
 class ModelRow(QFrame):
@@ -26,7 +34,7 @@ class ModelRow(QFrame):
         self,
         model: ModelInfo,
         manager: ModelManager,
-        on_status_change: Optional[Callable] = None,
+        on_status_change: Callable | None = None,
     ):
         super().__init__()
         
@@ -221,7 +229,7 @@ class ModelManagerWindow(QDialog):
         """)
         
         self.manager = ModelManager()
-        self.model_rows: Dict[str, ModelRow] = {}
+        self.model_rows: dict[str, ModelRow] = {}
         
         self._create_ui()
     
@@ -260,9 +268,6 @@ class ModelManagerWindow(QDialog):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setSpacing(10)
-        
-        # Translation models section
-        self._create_model_section(scroll_layout, t("translation_models"), [ModelType.NLLB])
         
         # Streaming models section
         self._create_model_section(scroll_layout, t("streaming_models"), [ModelType.SHERPA])
@@ -303,7 +308,6 @@ class ModelManagerWindow(QDialog):
     
     def _on_status_change(self):
         """Called when any model's status changes."""
-        pass
     
     def _open_models_folder(self):
         """Open the models folder in file explorer."""
@@ -323,7 +327,7 @@ class ModelDownloadDialog(QDialog):
     
     progress_updated = pyqtSignal(str, float, str)
     
-    def __init__(self, parent, models_to_download: list, on_complete: Optional[Callable] = None):
+    def __init__(self, parent, models_to_download: list, on_complete: Callable | None = None):
         super().__init__(parent)
         
         self.models_to_download = models_to_download

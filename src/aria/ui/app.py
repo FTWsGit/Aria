@@ -2,25 +2,24 @@
 Main Application using PyQt6 - Coordinates settings window, overlay, and pipeline.
 """
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import QTimer, QObject, pyqtSignal
-import threading
-import sys
 import os
-from typing import Optional, Union
+import sys
+import threading
 
+from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QApplication
+
+from ..events import SubtitleEvent
+from ..i18n import t
+from ..livecaptions.pipeline import LiveCaptionsPipeline
+from ..logger import set_console_mode, start_simple_log_session
+from ..pipeline import StreamingPipeline
+from ..settings_manager import get_settings_manager
+from ..timezone_utils import set_app_timezone_name
 from .settings_window import SettingsWindow
 from .subtitle_overlay import SubtitleOverlay
 from .system_tray import SystemTray
-from ..events import SubtitleEvent
-from ..pipeline import StreamingPipeline
-from ..livecaptions.pipeline import LiveCaptionsPipeline
-from ..model_manager import ModelManager, ModelType, ModelStatus
-from ..i18n import t
-from ..settings_manager import get_settings_manager
-from ..logger import set_console_mode, start_simple_log_session
-from ..timezone_utils import set_app_timezone_name
 
 
 class PipelineSignals(QObject):
@@ -38,13 +37,13 @@ class App:
     
     def __init__(self):
         """Initialize the application."""
-        self._settings_window: Optional[SettingsWindow] = None
-        self._overlay: Optional[SubtitleOverlay] = None
-        self._translation_overlay: Optional[SubtitleOverlay] = None
-        self._pipeline: Optional[Union[StreamingPipeline, LiveCaptionsPipeline]] = None
-        self._tray: Optional[SystemTray] = None
+        self._settings_window: SettingsWindow | None = None
+        self._overlay: SubtitleOverlay | None = None
+        self._translation_overlay: SubtitleOverlay | None = None
+        self._pipeline: StreamingPipeline | LiveCaptionsPipeline | None = None
+        self._tray: SystemTray | None = None
         self._is_running = False
-        self._last_settings: Optional[dict] = None
+        self._last_settings: dict | None = None
         self._is_livecaptions_mode = False
         self._enable_translation = False
         self._overlay_visible = True
@@ -206,6 +205,12 @@ class App:
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
                         auto_hide_window=False,  # Keep Windows LiveCaptions window visible
+                        openai_endpoint=settings.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
+                        openai_api_key=settings.get("openai_api_key", ""),
+                        openai_model_name=settings.get("openai_model_name", ""),
+                        openai_temperature=settings.get("openai_temperature", 0.2),
+                        openai_max_tokens=settings.get("openai_max_tokens", 1024),
+                        openai_system_prompt=settings.get("openai_system_prompt", ""),
                     )
                 else:
                     # Use Sherpa-ONNX streaming pipeline (auto-discovers model files)
@@ -217,6 +222,12 @@ class App:
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
                         audio_source=settings.get("audio_source", "system"),
+                        openai_endpoint=settings.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
+                        openai_api_key=settings.get("openai_api_key", ""),
+                        openai_model_name=settings.get("openai_model_name", ""),
+                        openai_temperature=settings.get("openai_temperature", 0.2),
+                        openai_max_tokens=settings.get("openai_max_tokens", 1024),
+                        openai_system_prompt=settings.get("openai_system_prompt", ""),
                     )
                 
                 self._pipeline.start()
@@ -350,59 +361,10 @@ class App:
     
     def _check_all_required_models(self, settings: dict) -> bool:
         """Check if all required models are available and prompt to download if not."""
-        missing_models = []
-        manager = ModelManager()
-        mode = settings.get("mode", "realtime")
-
-        if mode == "livecaptions":
-            # Only check NLLB if translation is enabled
-            if settings.get("enable_translation", False) and settings.get("translation_engine", "google") == "nllb":
-                for m in manager.get_all_models():
-                    if m.model_type == ModelType.NLLB:
-                        status = manager.get_status(m)
-                        if status != ModelStatus.DOWNLOADED:
-                            missing_models.append(m)
-                        break
-        else:
-            # Realtime mode: Sherpa-ONNX model is auto-discovered from disk.
-            # No model download check needed — user manages model files manually.
-            pass
-
-        # Check NLLB model (if translation enabled with NLLB engine)
-        if settings.get("enable_translation", False) and settings.get("translation_engine", "google") == "nllb":
-            already_nllb = any(m.model_type == ModelType.NLLB for m in missing_models)
-            if not already_nllb:
-                for m in manager.get_all_models():
-                    if m.model_type == ModelType.NLLB:
-                        status = manager.get_status(m)
-                        if status != ModelStatus.DOWNLOADED:
-                            missing_models.append(m)
-                        break
-
-        if not missing_models:
-            return True
-        
-        # Build model names list (translate names)
-        model_names = "\n".join([t(m.name) for m in missing_models])
-        
-        # Show download dialog
-        from .model_manager_window import show_download_dialog
-        
-        result = QMessageBox.question(
-            self._settings_window,
-            t("model_not_downloaded_title"),
-            t("model_not_downloaded_msg").format(models=model_names),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if result == QMessageBox.StandardButton.Yes:
-            show_download_dialog(
-                self._settings_window,
-                missing_models,
-                on_complete=lambda: self._on_start(settings)
-            )
-        
-        return False
+        # Realtime mode: Sherpa-ONNX model is auto-discovered from disk.
+        # LiveCaptions mode: no models needed.
+        # Translation models are no longer managed by ARIA.
+        return True
 
     def _toggle_overlay_visibility(self) -> bool:
         """Toggle subtitle overlay visibility and persist setting."""

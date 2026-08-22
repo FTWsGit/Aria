@@ -7,8 +7,8 @@ Provides file and console logging with session-based detailed/simple logs.
 import logging
 import sys
 from pathlib import Path
-from .timezone_utils import now_in_app_timezone, datetime_from_timestamp
 
+from .timezone_utils import datetime_from_timestamp, now_in_app_timezone
 
 # Global logger instance
 _logger = None

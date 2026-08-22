@@ -24,7 +24,7 @@ TRANSLATIONS = {
     "engine": "引擎",
     "target_lang": "譯文",
     "engine_google": "Google 雲端",
-    "engine_nllb": "NLLB 本地",
+    
     
     # Model settings
     "model_settings": "模型設定",
@@ -100,6 +100,7 @@ TRANSLATIONS = {
     "engine_google_free": "Google",
     "engine_baidu": "百度翻譯",
     "engine_youdao": "有道翻譯 (僅中英)",
+    "engine_openai": "OpenAI 相容",
     "engine_bing": "Bing",
     "engine_alibaba": "阿里翻譯",
     "translation_disclaimer": "",
@@ -121,12 +122,12 @@ TRANSLATIONS = {
     # Model manager - model names
     "model_name_sherpa_zh_en": "Sherpa-ONNX",
     
-    "model_name_nllb": "NLLB 翻譯模型",
+    
     
     # Model manager - descriptions
     "model_desc_sherpa_zh_en": "流式語音辨識",
     
-    "model_desc_nllb": "離線多語言翻譯 (600M 版本)",
+    
     
     # Download status messages
     "download_status_downloading": "正在下載 {name}...",

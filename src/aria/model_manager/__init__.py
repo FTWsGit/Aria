@@ -3,17 +3,17 @@ Model Manager module - Handles model downloading and management.
 """
 
 from .manager import (
-    ModelManager,
-    ModelInfo,
-    ModelType,
-    ModelStatus,
     SUPPORTED_MODELS,
+    ModelInfo,
+    ModelManager,
+    ModelStatus,
+    ModelType,
 )
 
 __all__ = [
-    "ModelManager",
-    "ModelInfo",
-    "ModelType",
-    "ModelStatus",
     "SUPPORTED_MODELS",
+    "ModelInfo",
+    "ModelManager",
+    "ModelStatus",
+    "ModelType",
 ]

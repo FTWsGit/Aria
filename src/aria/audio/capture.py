@@ -5,11 +5,13 @@ This module captures audio output from the system (what you hear through speaker
 using Windows Audio Session API (WASAPI) in loopback mode.
 """
 
-import threading
 import queue
-from typing import Callable, Optional
+import threading
+from collections.abc import Callable
+
 import numpy as np
-from ..logger import info, debug, warning
+
+from ..logger import debug, info, warning
 
 try:
     import pyaudiowpatch as pyaudio
@@ -43,12 +45,12 @@ class AudioCapture:
         self,
         source: str = "system",
     ):
-        self._pyaudio: Optional[object] = None
-        self._stream: Optional[object] = None
+        self._pyaudio: object | None = None
+        self._stream: object | None = None
         self._is_running = False
         self._audio_queue: queue.Queue = queue.Queue()
-        self._callback: Optional[Callable[[np.ndarray, int], None]] = None
-        self._capture_thread: Optional[threading.Thread] = None
+        self._callback: Callable[[np.ndarray, int], None] | None = None
+        self._capture_thread: threading.Thread | None = None
         self._source = source
         if self._source == "ts_tail":
             warning("AudioCapture: 'ts_tail' has been removed, fallback to system audio")
@@ -85,7 +87,7 @@ class AudioCapture:
         try:
             pa = pyaudio.PyAudio()
 
-            default_input_idx: Optional[int] = None
+            default_input_idx: int | None = None
             try:
                 default_input = pa.get_default_input_device_info()
                 default_input_idx = int(default_input["index"])

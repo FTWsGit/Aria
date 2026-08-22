@@ -6,6 +6,7 @@ and generates real-time bilingual subtitles using AI.
 """
 
 import os
+
 # Disable tqdm progress bars early to avoid threading issues with HuggingFace downloads
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 os.environ["HF_HUB_DISABLE_TQDM"] = "1"

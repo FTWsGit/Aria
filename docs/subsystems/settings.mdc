@@ -28,6 +28,11 @@ DEFAULT_SETTINGS = {
     "timezone": "system",
     "overlay_visible": True,
     "console_mode": "verbose",
+    "openai_endpoint": "http://127.0.0.1:8080/v1",
+    "openai_api_key": "",
+    "openai_model_name": "",
+    "openai_temperature": 0.2,
+    "openai_max_tokens": 128,
 }
 ```
 

@@ -3,9 +3,7 @@ Windows LiveCaptions Controller
 Automatically launch and configure LiveCaptions
 """
 
-import os
 import time
-from typing import Optional
 
 try:
     import pyautogui
@@ -21,7 +19,7 @@ except ImportError:
     UIAUTOMATION_AVAILABLE = False
     auto = None
 
-from ..logger import info, debug, warning, error
+from ..logger import debug, error, info, warning
 
 
 class LiveCaptionsController:
@@ -126,8 +124,8 @@ class LiveCaptionsController:
             return False
         
         try:
-            import win32gui
             import win32con
+            import win32gui
             
             # Find window by class name
             hwnd = win32gui.FindWindow("LiveCaptionsDesktopWindow", None)

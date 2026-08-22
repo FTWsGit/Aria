@@ -6,7 +6,6 @@ while keeping the SubtitleEvent dataclass available to other pipelines.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -17,8 +16,8 @@ class SubtitleEvent:
     confidence: float
     timestamp: float
     is_partial: bool = False
-    translated_text: Optional[str] = None  # Translation (if enabled)
-    target_language: Optional[str] = None  # Target language for translation
+    translated_text: str | None = None  # Translation (if enabled)
+    target_language: str | None = None  # Target language for translation
     # Dual-buffer support
-    committed_translation: Optional[str] = None
-    draft_translation: Optional[str] = None
+    committed_translation: str | None = None
+    draft_translation: str | None = None

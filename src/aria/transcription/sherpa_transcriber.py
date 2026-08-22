@@ -5,10 +5,9 @@ Uses Sherpa-ONNX OnlineRecognizer for true streaming transcription.
 Model paths are provided explicitly — no hardcoded model configs.
 """
 
-from typing import Optional
 import numpy as np
 
-from ..logger import info, debug
+from ..logger import debug, info
 
 # Sherpa import with error handling
 try:

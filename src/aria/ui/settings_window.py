@@ -4,22 +4,34 @@ Main Settings Window for ARIA using PyQt6.
 A modern, beautiful settings interface.
 """
 
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QPushButton, QComboBox, QFrame, QCheckBox, QSlider,
-    QMessageBox, QApplication, QSizePolicy
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QIcon
-from typing import Callable, Optional
-import os
 import sys
+from collections.abc import Callable
 
-from ..settings_manager import get_settings_manager
-from .model_manager_window import show_model_manager
-from ..i18n import t, get_current_language, set_language, LANGUAGES
-from ..timezone_utils import available_timezone_names, validate_timezone_name
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
 from ..audio.capture import AudioCapture
+from ..i18n import LANGUAGES, get_current_language, set_language, t
+from ..settings_manager import get_settings_manager
+from ..timezone_utils import available_timezone_names, validate_timezone_name
+from .model_manager_window import show_model_manager
 
 
 class SettingsWindow(QMainWindow):
@@ -78,8 +90,8 @@ class SettingsWindow(QMainWindow):
     def __init__(
         self,
         on_start: Callable[[dict], None],
-        on_quit: Optional[Callable[[], None]] = None,
-        on_toggle_overlay: Optional[Callable[[], bool]] = None,
+        on_quit: Callable[[], None] | None = None,
+        on_toggle_overlay: Callable[[], bool] | None = None,
     ):
         """Initialize the settings window.
         
@@ -496,15 +508,139 @@ class SettingsWindow(QMainWindow):
         engine_row.addWidget(QLabel(t("engine") + ":"))
         self.trans_engine_dropdown = QComboBox()
         self.trans_engine_dropdown.addItems([
-            t("engine_nllb"),
+            t("engine_openai"),
             t("engine_google_free"),
             t("engine_bing"),
             t("engine_youdao"),
         ])
-        self.trans_engine_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
+        self.trans_engine_dropdown.currentTextChanged.connect(self._on_engine_change)
         engine_row.addWidget(self.trans_engine_dropdown)
         engine_row.addStretch()
         layout.addLayout(engine_row)
+        
+        # OpenAI parameter section (hidden by default, shown when OpenAI selected)
+        self.openai_section = QFrame()
+        self.openai_section.setStyleSheet("""
+            QFrame {
+                background-color: #333333;
+                border-radius: 6px;
+                padding: 10px;
+            }
+            QLabel {
+                color: #aaaaaa;
+                font-size: 12px;
+            }
+            QLineEdit, QDoubleSpinBox, QSpinBox {
+                background-color: #2a2a2a;
+                color: white;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 4px 8px;
+            }
+            QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
+                border-color: #3B8ED0;
+            }
+            QSpinBox::up-button, QDoubleSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                height: 14px;
+                background-color: #444444;
+                border-radius: 3px;
+                margin: 2px 2px 0 0;
+            }
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+                background-color: #3B8ED0;
+            }
+            QSpinBox::down-button, QDoubleSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                height: 14px;
+                background-color: #444444;
+                border-radius: 3px;
+                margin: 0 2px 2px 0;
+            }
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+                background-color: #3B8ED0;
+            }
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 6px solid white;
+                width: 0px;
+                height: 0px;
+            }
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 6px solid white;
+                width: 0px;
+                height: 0px;
+            }
+        """)
+        openai_layout = QVBoxLayout(self.openai_section)
+        openai_layout.setContentsMargins(10, 8, 10, 8)
+        openai_layout.setSpacing(6)
+        
+        # Endpoint
+        ep_row = QHBoxLayout()
+        ep_row.addWidget(QLabel("Endpoint:"))
+        self.openai_endpoint = QLineEdit("http://127.0.0.1:8080/v1")
+        self.openai_endpoint.textChanged.connect(lambda _: self._persist_ui_settings())
+        ep_row.addWidget(self.openai_endpoint)
+        openai_layout.addLayout(ep_row)
+        
+        # API Key
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("API Key:"))
+        self.openai_api_key = QLineEdit()
+        self.openai_api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.openai_api_key.setPlaceholderText("optional")
+        self.openai_api_key.textChanged.connect(lambda _: self._persist_ui_settings())
+        key_row.addWidget(self.openai_api_key)
+        openai_layout.addLayout(key_row)
+        
+        # Model Name
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Model:"))
+        self.openai_model_name = QLineEdit()
+        self.openai_model_name.setPlaceholderText("default")
+        self.openai_model_name.textChanged.connect(lambda _: self._persist_ui_settings())
+        model_row.addWidget(self.openai_model_name)
+        openai_layout.addLayout(model_row)
+        
+        # System Prompt
+        sys_row = QHBoxLayout()
+        sys_row.addWidget(QLabel("System Prompt:"))
+        self.openai_system_prompt = QLineEdit()
+        self.openai_system_prompt.setPlaceholderText("default")
+        self.openai_system_prompt.textChanged.connect(lambda _: self._persist_ui_settings())
+        sys_row.addWidget(self.openai_system_prompt)
+        openai_layout.addLayout(sys_row)
+        
+        # Temperature + Max Tokens in one row
+        params_row = QHBoxLayout()
+        params_row.addWidget(QLabel("Temp:"))
+        self.openai_temperature = QDoubleSpinBox()
+        self.openai_temperature.setRange(0.0, 2.0)
+        self.openai_temperature.setSingleStep(0.1)
+        self.openai_temperature.setValue(0.2)
+        self.openai_temperature.valueChanged.connect(lambda _: self._persist_ui_settings())
+        params_row.addWidget(self.openai_temperature)
+        params_row.addStretch()
+        params_row.addWidget(QLabel("Max Tokens:"))
+        self.openai_max_tokens = QSpinBox()
+        self.openai_max_tokens.setRange(1, 4096)
+        self.openai_max_tokens.setValue(4096)
+        self.openai_max_tokens.valueChanged.connect(lambda _: self._persist_ui_settings())
+        params_row.addWidget(self.openai_max_tokens)
+        openai_layout.addLayout(params_row)
+        
+        self.openai_section.hide()
+        layout.addWidget(self.openai_section)
         
         # Target language dropdown
         target_row = QHBoxLayout()
@@ -648,6 +784,14 @@ class SettingsWindow(QMainWindow):
             self.trans_status.setText("OFF")
             self.trans_status.setStyleSheet("color: #888888;")
         self._persist_ui_settings()
+
+    def _on_engine_change(self, _text: str):
+        """Handle translation engine change - show/hide OpenAI params."""
+        if _text == t("engine_openai"):
+            self.openai_section.show()
+        else:
+            self.openai_section.hide()
+        self._persist_ui_settings()
     
     def _on_audio_source_change(self, _value: str):
         """Handle audio source change."""
@@ -661,7 +805,7 @@ class SettingsWindow(QMainWindow):
 
         return "system"
 
-    def _populate_audio_source_dropdown(self, preferred_source: Optional[str] = None) -> None:
+    def _populate_audio_source_dropdown(self, preferred_source: str | None = None) -> None:
         """Populate audio source dropdown with system and microphone devices."""
         selected_source = preferred_source or self._get_selected_audio_source()
         if selected_source == "ts_tail":
@@ -793,12 +937,12 @@ class SettingsWindow(QMainWindow):
         # Get translation engine - map display name to engine ID
         engine_display = self.trans_engine_dropdown.currentText()
         engine_map = {
-            t("engine_nllb"): "nllb",
+            t("engine_openai"): "openai",
             t("engine_google_free"): "google_free",
             t("engine_bing"): "bing",
             t("engine_youdao"): "youdao",
         }
-        engine = engine_map.get(engine_display, "nllb")  # Default to NLLB
+        engine = engine_map.get(engine_display, "bing")
         tz_name = self.timezone_dropdown.currentText().strip() or "system"
         if not validate_timezone_name(tz_name):
             tz_name = "system"
@@ -813,6 +957,16 @@ class SettingsWindow(QMainWindow):
             "target_language": target_lang,
             "audio_source": self._get_selected_audio_source(),
         }
+        
+        # OpenAI params (always saved, even if not using OpenAI)
+        settings.update({
+            "openai_endpoint": self.openai_endpoint.text().strip(),
+            "openai_api_key": self.openai_api_key.text().strip(),
+            "openai_model_name": self.openai_model_name.text().strip(),
+            "openai_temperature": self.openai_temperature.value(),
+            "openai_max_tokens": self.openai_max_tokens.value(),
+            "openai_system_prompt": self.openai_system_prompt.text().strip(),
+        })
         
         # Save settings
         self._save_settings(settings)
@@ -865,9 +1019,9 @@ class SettingsWindow(QMainWindow):
         self.trans_checkbox.setChecked(sm.get("enable_translation", False))
         
         # Translation engine - map engine ID to display name
-        engine = sm.get("translation_engine", "nllb")
+        engine = sm.get("translation_engine", "bing")
         engine_reverse_map = {
-            "nllb": t("engine_nllb"),
+            "openai": t("engine_openai"),
             "google_free": t("engine_google_free"),
             "bing": t("engine_bing"),
             "youdao": t("engine_youdao"),
@@ -875,9 +1029,11 @@ class SettingsWindow(QMainWindow):
             "google": t("engine_google_free"),
             "baidu": t("engine_bing"),
             "alibaba": t("engine_bing"),
+            "nllb": t("engine_bing"),
         }
-        display_name = engine_reverse_map.get(engine, t("engine_nllb"))
+        display_name = engine_reverse_map.get(engine, t("engine_bing"))
         self.trans_engine_dropdown.setCurrentText(display_name)
+        self._on_engine_change(display_name)  # 强制同步面板显示状态
         
         # Target language
         target = sm.get("target_language", "zho_Hant")
@@ -906,6 +1062,14 @@ class SettingsWindow(QMainWindow):
         # Overlay toggle state
         overlay_visible = sm.get("overlay_visible", True)
         self.overlay_toggle_button.setText("隐藏字幕悬浮窗" if overlay_visible else "显示字幕悬浮窗")
+
+        # OpenAI params
+        self.openai_endpoint.setText(sm.get("openai_endpoint", "http://127.0.0.1:1234/v1"))
+        self.openai_api_key.setText(sm.get("openai_api_key", ""))
+        self.openai_model_name.setText(sm.get("openai_model_name", ""))
+        self.openai_temperature.setValue(sm.get("openai_temperature", 0.2))
+        self.openai_max_tokens.setValue(sm.get("openai_max_tokens", 1024))
+        self.openai_system_prompt.setText(sm.get("openai_system_prompt", ""))
     
     # === Public API ===
     

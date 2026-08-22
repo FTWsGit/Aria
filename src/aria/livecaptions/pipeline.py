@@ -3,20 +3,19 @@ LiveCaptions Pipeline
 Integrates LiveCaptions monitoring, text processing, and translation
 """
 
-import threading
 import time
-from typing import Optional, Callable
+from collections.abc import Callable
 
-from .monitor import LiveCaptionsMonitor, CaptionEvent
+from ..events import SubtitleEvent
+from ..logger import debug, error, info, warning
 from .controller import LiveCaptionsController
 from .manager import TranslationStateManager
-from ..events import SubtitleEvent
-from ..logger import info, debug, warning, error
+from .monitor import CaptionEvent, LiveCaptionsMonitor
 
 # Translation support (optional)
 try:
-    from ..translation.translator import create_translator, CTRANSLATE2_AVAILABLE, GOOGLETRANS_AVAILABLE
-    TRANSLATION_AVAILABLE = CTRANSLATE2_AVAILABLE or GOOGLETRANS_AVAILABLE
+    from ..translation.translator import GOOGLETRANS_AVAILABLE, TRANSLATORS_AVAILABLE, create_translator
+    TRANSLATION_AVAILABLE = TRANSLATORS_AVAILABLE or GOOGLETRANS_AVAILABLE
 except ImportError:
     TRANSLATION_AVAILABLE = False
     create_translator = None
@@ -49,7 +48,7 @@ class LiveCaptionsPipeline:
     
     def __init__(
         self,
-        on_subtitle: Optional[Callable[[SubtitleEvent], None]] = None,
+        on_subtitle: Callable[[SubtitleEvent], None] | None = None,
         # Translation settings
         enable_translation: bool = False,
         translation_engine: str = "google",
@@ -57,6 +56,13 @@ class LiveCaptionsPipeline:
         # LiveCaptions settings
         auto_hide_window: bool = True,
         poll_interval: float = 0.1,
+        # OpenAI translator settings
+        openai_endpoint: str = "http://127.0.0.1:1234/v1",
+        openai_api_key: str = "",
+        openai_model_name: str = "",
+        openai_temperature: float = 0.2,
+        openai_max_tokens: int = 1024,
+        openai_system_prompt: str = "",
     ):
         """
         Initialize the pipeline
@@ -64,7 +70,7 @@ class LiveCaptionsPipeline:
         Args:
             on_subtitle: Subtitle callback function
             enable_translation: Whether to enable translation
-            translation_engine: Translation engine ("google", "nllb")
+            translation_engine: Translation engine ("google", "bing", "youdao", "openai")
             target_language: Target language code
             auto_hide_window: Whether to auto-hide LiveCaptions window
             poll_interval: Monitoring poll interval in seconds
@@ -93,6 +99,12 @@ class LiveCaptionsPipeline:
                 self._translator = create_translator(
                     engine=translation_engine,
                     target_language=target_language,
+                    openai_endpoint=openai_endpoint,
+                    openai_api_key=openai_api_key,
+                    openai_model_name=openai_model_name,
+                    openai_temperature=openai_temperature,
+                    openai_max_tokens=openai_max_tokens,
+                    openai_system_prompt=openai_system_prompt,
                 )
                 info(f"LiveCaptionsPipeline: Translator initialized ({translation_engine})")
             except Exception as e:

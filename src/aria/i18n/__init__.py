@@ -5,12 +5,11 @@ Provides multi-language support for the UI.
 """
 
 from typing import Dict, Optional
+
 from aria.settings_manager import get_settings_manager
 
 # Import translation modules
-from . import zh_TW
-from . import zh_CN
-from . import en
+from . import en, zh_CN, zh_TW
 
 # Available languages
 LANGUAGES = {
@@ -23,8 +22,8 @@ LANGUAGES = {
 DEFAULT_LANGUAGE = "zh_CN"
 
 # Current language cache
-_current_language: Optional[str] = None
-_translations: Dict[str, str] = {}
+_current_language: str | None = None
+_translations: dict[str, str] = {}
 
 
 def get_current_language() -> str:
