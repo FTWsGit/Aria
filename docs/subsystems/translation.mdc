@@ -1,0 +1,50 @@
+---
+name: "translation"
+kind: "subsystem"
+description: "翻译系统。修改 translation/ 时读。"
+alwaysApply: false
+---
+
+# 翻译系统
+
+## 职责
+
+将 ASR 转录文本翻译为目标语言，支持多种引擎。
+
+## 翻译引擎
+
+| 引擎 | 实现 | 特点 |
+|---|---|---|
+| NLLB | `NLLBTranslator` (CTranslate2) | 本地离线，NLLB-200 600M int8 |
+| Google | `GoogleTranslator` (googletrans) | 在线免费 |
+| Bing | `TranslatorsLibWrapper` | 在线 |
+| Youdao | `TranslatorsLibWrapper` | 仅中英互译 |
+
+## 工厂函数
+
+```python
+translator = create_translator(engine="nllb", target_language="zho_Hant")
+result = translator.translate("hello", source_language="en")
+```
+
+## TranslationStateManager
+
+位于 `livecaptions/manager.py`，被实时管道和 Live Captions 管道共享。
+
+- `process_text(raw_text)` → `TranslationState`（含 committed_text 和 draft_text）
+- 滑动窗口 + 模糊匹配，区分已提交翻译和草稿翻译
+- 避免重复翻译已稳定的文本
+
+## 依赖
+
+- `ctranslate2`：NLLB 推理
+- `sentencepiece`：NLLB tokenizer
+- `huggingface_hub`：NLLB 模型下载
+- `googletrans`：Google 翻译（可选）
+- `translators`：Bing/Youdao（可选）
+
+## 不变式
+
+- 翻译独立于 ASR，可单独开关
+- 引擎不可用时静默降级，不抛异常
+- 翻译在后台线程执行，不阻塞 ASR

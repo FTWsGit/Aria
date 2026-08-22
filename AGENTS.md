@@ -1,141 +1,117 @@
 # AGENTS.md
 
-## Project overview
+## 铁律
+- 使用中文和用户交流
+- 优先向用户确认而非直接动手修改
+- 调用工具(tool callling)之前，必须要简述现在要做什么，表明工具调用动机。不超过20个字
 
-ARIA is a Windows desktop application that captures system audio or microphone input and renders live transcription in a movable PyQt6 overlay. It has three recognition paths: Precise (Faster-Whisper), Realtime (Sherpa-ONNX/Vosk), and Windows 11 Live Captions. Translation is a separate layer and can be online or local. The repository targets Python 3.10+ and Windows. See `README.md` for user-facing behavior and `CHANGELOG.md` for release history.
+## 项目概述
 
-## Repository layout
+ARIA 是一个 Windows 桌面应用，捕获系统音频或麦克风输入，在可移动的 PyQt6 悬浮窗中实时渲染转录文本。目前有两条识别路径：Sherpa-ONNX 流式识别和 Windows 11 内建字幕。翻译是独立层，支持在线和本地。项目要求 Python 3.10+，仅支持 Windows。
 
-- `src/realtime_subtitles/audio/`: Windows audio capture, buffering, and VAD.
-- `src/realtime_subtitles/transcription/`: ASR backends. Keep backend-specific code here.
-- `src/realtime_subtitles/translation/`: translation providers and local NLLB support.
-- `src/realtime_subtitles/ui/`: PyQt6 windows, overlays, settings, and tray UI.
-- `src/realtime_subtitles/livecaptions/`: Windows Live Captions integration.
-- `src/realtime_subtitles/model_manager/`: model discovery/download/configuration.
-- `src/realtime_subtitles/pipeline.py`: pipeline orchestration and the existing Faster-Whisper pipeline.
-- `src/realtime_subtitles/vosk_pipeline.py`: Vosk-specific realtime pipeline.
-- `src/realtime_subtitles/settings_manager.py`: persistent settings.
-- `src/realtime_subtitles/logger.py`: application logging and transcript logging.
-- `models/`: local model data in packaged/full builds; do not commit large model artifacts unless explicitly requested.
-- `pyproject.toml`: package metadata, dependencies, CLI entry point, and Ruff configuration.
+## 开发环境
 
-## Development environment
+要求：
 
-Requirements:
+- Windows 10/11。
+- Python >= 3.10。
+- 使用 uv 管理虚拟环境和依赖。
 
-- Windows 10/11 for meaningful integration testing.
-- Python >= 3.10; match the repository's supported interpreter versions.
-- Use a virtual environment for source development.
-- The packaged Full build ships an embedded Python runtime; source development does not.
-
-Install the project in editable mode with development dependencies:
+用 uv 安装项目（可编辑模式 + 开发依赖）：
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+uv venv
+uv sync
 ```
 
-Run the application from the source tree with:
+运行应用：
 
 ```powershell
-python -m realtime_subtitles.main
+uv run aria
 ```
 
-The package also exposes the `aria` console entry point.
+## 验证命令
 
-## Validation commands
-
-Before submitting a change, run the narrowest relevant checks first, then the full available suite when practical:
+始终使用 uv。提交前先跑最相关的检查，再跑完整套件：
 
 ```powershell
-python -m ruff check .
-python -m pytest
+uv run ruff check .
+uv run pytest
 ```
 
-For a packaging/import smoke test:
+打包/导入冒烟测试：
 
 ```powershell
-python -m pip install -e .
-python -c "import realtime_subtitles; print('import ok')"
+uv pip install -e .
+uv run python -c "import aria; print('import ok')"
 ```
 
-If a test requires Windows audio devices, GUI interaction, CUDA, or installed models, document that limitation rather than pretending the test passed. Do not fabricate test results.
+如果测试需要 Windows 音频设备、GUI 交互、CUDA 或已安装的模型，请注明限制，不要伪造测试结果。
 
-## Architecture rules
 
-1. Preserve the separation between audio capture, ASR, translation, and UI.
-2. Add a new ASR engine under `transcription/` or a dedicated pipeline module; do not embed model-specific inference inside UI classes.
-3. Keep translation independent from ASR so one transcript can be sent to multiple translation providers.
-4. Prefer callback/event interfaces for partial and final transcript updates. Realtime backends should not block the UI thread.
-5. Avoid unbounded queues in realtime paths. If a producer can outrun inference, bound the queue and prefer dropping stale audio over accumulating latency.
-6. Load/warm models before starting live capture when possible; avoid causing model initialization to build an audio backlog.
-7. Preserve the existing settings/logging abstractions instead of introducing another global configuration mechanism.
+## 注释/文档纪律
 
-## Realtime ASR guidance
+- 注释/文档只写**做了什么、为什么**。不写"怎么摸索到的、历史上踩过什么坑、为什么没用另一方案"。对比可行 vs 不可行、踩坑史、淘汰方案是 git log / issue tracker 的事，不进注释
+- 注释中绝不提及或引用任何外部文档，不能用诸如`详情见xxx.mdc`、`具体看xxx领域的文档`
+- 一句话能写的规矩**不用扩成一段论证**。论证口头给用户讲，不写进文件；AI 读到对应代码/类型自会懂为什么，不用注释先讲一遍
+- 不给已有代码补解释性注释
 
-ARIA's existing Sherpa-ONNX realtime backend is a true streaming recognizer with partial/final-oriented callbacks and uses ONNX models. Its current built-in Sherpa configuration is Chinese/English; Vosk is used for Japanese. Do not claim that the built-in Realtime mode supports arbitrary languages without adding and testing a model/backend.
+- 文档 只写"项目是什么"，不写用户的要求、展望，不写讨论过程，不写其他方案，不写其他文档的内容
+- `description`骨架提示只写**是什么、何时读**。不写写法理论、不写"不是什么"。
 
-For new realtime ASR work:
+## 架构规则
 
-- Prefer genuinely streaming architectures (e.g. streaming Transducer/FastConformer-style models) over repeatedly decoding overlapping Whisper windows.
-- Prefer ONNX Runtime-compatible models for Windows/AMD-friendly deployment when quality and latency are acceptable.
-- Keep model selection/configuration data separate from inference logic.
-- Do not assume an ASR model is streaming merely because it is called "realtime"; verify its inference API and state handling.
-- Preserve 16 kHz mono PCM expectations unless a backend explicitly requires otherwise.
-- Measure end-to-end latency, not just model inference time. Include capture, VAD/buffering, decoding, translation, and rendering.
-- For live captions, correctness of finalization and avoiding duplicated text matter as much as raw token latency.
+1. 保持音频捕获、ASR、翻译、UI 的分离。
+2. 翻译独立于 ASR，一份转录可发送到多个翻译提供者。
+3. 优先使用回调/事件接口传递部分和最终转录结果。实时后端不应阻塞 UI 线程。
+4. 实时路径中避免无界队列。如果生产者快于推理，限制队列并优先丢弃过时音频。
+5. 尽可能在开始实时捕获前加载/预热模型，避免模型初始化导致音频积压。
+6. 使用现有 settings/logging 抽象，不要引入新的全局配置机制。
 
-## Model and dependency policy
+## 流式 ASR 指南
 
-- Do not add a heavyweight ML dependency when an existing dependency can provide the required capability.
-- Do not replace an existing backend wholesale unless the task requires it; prefer adding a backend behind the current abstraction.
-- Do not commit API keys, credentials, tokens, cookies, or user-specific configuration.
-- Do not commit downloaded model archives or generated runtime data.
-- For model URLs, versions, checksums, licenses, and language support, verify the upstream source before changing them.
-- Be explicit about CPU/GPU/DirectML/CUDA assumptions; do not silently introduce CUDA-only requirements into the realtime path.
+ARIA 的唯一 ASR 后端是 Sherpa-ONNX OnlineRecognizer，真正的流式识别器，持续产生 partial result。模型文件由用户自行管理，放置在 `models/` 目录下，管道自动发现。
 
-## UI and UX rules
+流式 ASR 开发注意事项：
 
-- Keep transcription/rendering work off the Qt UI thread.
-- Preserve movable/resizable subtitle and translation overlays unless the task explicitly changes the interaction model.
-- Avoid blocking network calls or model downloads from the UI thread.
-- Keep source subtitles and translated subtitles logically separate so either can be disabled independently.
-- Follow existing localization patterns under `i18n/`; do not hard-code user-facing strings when a translation key already exists.
+- 优先使用真正的流式架构（如 streaming Transducer/Zipformer），而非反复解码重叠的 Whisper 窗口。
+- 优先使用 ONNX Runtime 兼容模型，以便 Windows/AMD 友好部署。
+- 模型选择/配置与推理逻辑分离。
+- 不要仅因为模型叫"realtime"就假设它是流式的；验证其推理 API 和状态处理。
+- 保持 16 kHz 单声道 PCM，除非后端明确要求其他格式。
+- 测量端到端延迟，不仅是模型推理时间。包括捕获、解码、翻译和渲染。
+- 对于内建字幕，正确完成 finalization 和避免重复文本与原始 token 延迟同等重要。
 
-## Windows-specific rules
+## UI 和 UX 规则
 
-- Treat WASAPI loopback and Windows Live Captions integrations as platform-specific code; isolate platform assumptions from core pipeline logic.
-- Test both system-audio and microphone paths when touching `audio/`.
-- Be careful with device enumeration, default-device changes, sample rates, and resource cleanup on stop/restart.
-- Do not assume administrator privileges are available or required.
+- 转录/渲染工作保持在 Qt UI 线程之外。
+- 保持可移动/可调整大小的字幕和翻译悬浮窗，除非任务明确改变交互模式。
+- 避免在 UI 线程中阻塞网络调用或模型下载。
+- 保持源字幕和翻译字幕逻辑分离，以便可以独立禁用。
+- 遵循 `i18n/` 下的本地化模式；存在翻译 key 时不要硬编码用户可见字符串。
 
-## Change discipline
+## Windows 特定规则
 
-- Read the target file and its direct callers before editing it.
-- Match existing patterns and naming before introducing a new abstraction.
-- Keep diffs focused; do not perform unrelated refactors or formatting sweeps.
-- If behavior changes, add or update the smallest useful automated test. For hardware/GUI/model-dependent behavior, add a unit-testable seam where practical and document the remaining manual validation.
-- Update `CHANGELOG.md` only for user-visible changes that belong in the project's release history; do not turn it into a development journal.
-- Update README/docs when commands, supported languages, modes, or user-visible behavior change.
-- Never claim a language/model/backend is supported until it has been verified in code and, where possible, exercised end-to-end.
+- 将 WASAPI loopback 和 Windows 内建字幕集成视为平台特定代码；将平台假设与核心管道逻辑隔离。
+- 修改 `audio/` 时同时测试系统音频和麦克风路径。
+- 注意设备枚举、默认设备变更、采样率和停止/重启时的资源清理。
+- 不要假设需要或已获得管理员权限。
 
-## Realtime/translation correctness
+## 实时/翻译正确性
 
-When changing the live pipeline, explicitly reason about these states:
+修改实时管道时，明确区分以下状态：
 
-- partial transcript: mutable text shown while speech is continuing;
-- committed transcript: stable text that should not be translated repeatedly;
-- translation draft: replaceable translation for the current partial segment;
-- translation commit: stable translation corresponding to committed source text.
+- partial transcript：说话进行中显示的可变文本；
+- committed transcript：不应重复翻译的稳定文本；
+- translation draft：当前部分段落可替换的翻译；
+- translation commit：对应已提交源文本的稳定翻译。
 
-Avoid sending every partial ASR update to a translation API. Prefer translating finalized or deliberately debounced segments, with bounded concurrency, so translation latency cannot grow without limit.
+避免将每个 partial ASR 更新都发送到翻译 API。优先翻译已完成或故意去抖的段落，控制并发，防止翻译延迟无限增长。
 
-## Before finishing a task
+## 任务完成前
 
-1. Confirm the changed modules still import cleanly.
-2. Run Ruff on changed Python files and relevant tests.
-3. Run the full test suite when practical.
-4. For realtime changes, perform a manual smoke test with a real Windows audio source when available.
-5. Report exactly what was verified, what was not, and any hardware/model limitations.
+1. 确认修改的模块仍能干净导入。
+2. 对修改的 Python 文件运行 Ruff。
+3. 在可行时运行完整测试套件。
+4. 对于实时变更，在可用的 Windows 音频源上执行手动冒烟测试。
+5. 明确报告已验证的内容、未验证的内容以及任何硬件/模型限制。

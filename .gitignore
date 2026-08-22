@@ -2,15 +2,13 @@
 .venv/
 uv.lock
 __pycache__/
+.ruff_cache/
 
 # IDE
 .vscode/
 
 # logs
 logs/
-
-# docs
-docs/
 
 # runtime
 models/

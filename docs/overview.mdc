@@ -1,0 +1,61 @@
+---
+name: "overview"
+kind: "overview"
+description: "项目是什么、整体结构、核心规则。每个 session 必读。"
+alwaysApply: true
+---
+
+# ARIA
+
+Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮窗中实时渲染转录文本。
+
+## 识别路径
+
+两条路径：
+- **Sherpa-ONNX 流式识别**（实时模式）：音频直通 Sherpa OnlineRecognizer，无 VAD，无分段
+- **Windows 11 内建字幕**（Live Captions 模式）
+
+## 仓库结构
+
+| 目录 | 职责 |
+|---|---|
+| `src/aria/audio/` | Windows WASAPI 音频捕获 |
+| `src/aria/transcription/` | ASR 后端（仅 Sherpa-ONNX） |
+| `src/aria/translation/` | 翻译提供者（NLLB / Google / Bing / Youdao） |
+| `src/aria/ui/` | PyQt6 窗口、悬浮窗、设置、托盘 |
+| `src/aria/livecaptions/` | Windows 内建字幕集成 |
+| `src/aria/model_manager/` | 模型发现/下载/配置 |
+| `src/aria/pipeline.py` | Sherpa-ONNX 流式管道 |
+| `src/aria/settings_manager.py` | JSON 持久化设置 |
+| `src/aria/logger.py` | 应用日志和转录日志 |
+| `models/` | 本地模型文件（用户自行管理） |
+
+## 数据流
+
+```
+AudioCapture → PCM chunks → Sherpa-ONNX OnlineRecognizer → partial result → UI
+                                                    ↓
+                                              TranslationStateManager → 翻译 → UI
+```
+
+- 无 VAD，无分段，音频直通 ASR
+- 翻译独立于 ASR，异步执行
+- 持续产生 partial result，不等待句子结束
+
+## 核心规则
+
+1. ASR 后端统一为 Sherpa-ONNX，不添加新后端
+2. 翻译独立于 ASR，一份转录可发送到多个翻译提供者
+3. 实时路径不使用 VAD 或分段
+4. 模型文件由用户自行管理，放置在 `models/` 目录，管道自动发现
+5. 使用 uv 管理依赖，所有命令用 `uv run`
+6. 使用中文交流
+
+## 开发命令
+
+```powershell
+uv venv && uv sync          # 安装
+uv run aria                  # 运行
+uv run ruff check .          # 检查
+uv run pytest                # 测试
+```

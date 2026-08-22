@@ -1,0 +1,47 @@
+---
+name: "settings"
+kind: "subsystem"
+description: "设置持久化和配置。修改 settings_manager.py 时读。"
+alwaysApply: false
+---
+
+# 设置管理
+
+## 职责
+
+JSON 持久化用户设置，全局单例。
+
+## 存储位置
+
+`~/.config/realtime-subtitles/settings.json`
+
+## 默认设置
+
+```python
+DEFAULT_SETTINGS = {
+    "mode": "realtime",
+    "min_duration": 100,
+    "enable_translation": True,
+    "translation_engine": "bing",
+    "target_language": "zho_Hans",
+    "audio_source": "system",
+    "timezone": "system",
+    "overlay_visible": True,
+    "console_mode": "verbose",
+}
+```
+
+## 全局单例
+
+```python
+from aria.settings_manager import get_settings_manager
+sm = get_settings_manager()
+sm.set("key", value)
+sm.save()
+```
+
+## 不变式
+
+- 加载时合并默认值（新设置项不会丢失）
+- 保存失败不抛异常，仅 log error
+- 不引入新的全局配置机制

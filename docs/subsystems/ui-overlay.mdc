@@ -1,0 +1,40 @@
+---
+name: "ui-overlay"
+kind: "subsystem"
+description: "PyQt6 悬浮窗和设置界面。修改 ui/ 时读。"
+alwaysApply: false
+---
+
+# UI 系统
+
+## 组件
+
+| 文件 | 组件 | 职责 |
+|---|---|---|
+| `app.py` | `App` | 应用协调器，管理 pipeline、overlay、tray 生命周期 |
+| `settings_window.py` | `SettingsWindow` | 主设置窗口：模式选择、音频源、翻译配置、时区 |
+| `subtitle_overlay.py` | `SubtitleOverlay` | 可拖拽/调整大小的悬浮窗，双色渲染（committed+draft） |
+| `system_tray.py` | `SystemTray` | 系统托盘图标和菜单 |
+| `model_manager_window.py` | `ModelManagerWindow` | 模型下载/管理界面 |
+
+## 线程安全
+
+`PipelineSignals`（QObject + pyqtSignal）桥接后台线程和 Qt 主线程：
+- `subtitle` 信号：传递 `SubtitleEvent` 到 UI
+- `started` / `error` 信号：管道状态变更
+
+## 模式
+
+- **实时模式**：Sherpa-ONNX 流式识别，显示原文 + 翻译两个悬浮窗
+- **Live Captions 模式**：Windows 内建字幕显示原文，仅显示翻译悬浮窗
+
+## 设置持久化
+
+`SettingsWindow._gather_settings()` → `SettingsManager.set()` → `SettingsManager.save()` → JSON 文件
+
+## 不变式
+
+- 转录/渲染不在 UI 线程
+- 悬浮窗 frameless、always-on-top、可拖拽
+- 源字幕和翻译字幕逻辑分离，可独立开关
+- 用户可见字符串使用 i18n key，不硬编码

@@ -1,0 +1,29 @@
+---
+name: "model-manager"
+kind: "subsystem"
+description: "模型下载/发现/配置。修改 model_manager/ 时读。"
+alwaysApply: false
+---
+
+# 模型管理
+
+## 职责
+
+管理模型下载、状态查询、本地路径。
+
+## 模型类型
+
+- `ModelType.SHERPA`：Sherpa-ONNX ASR 模型
+- `ModelType.NLLB`：NLLB 翻译模型
+
+## 下载方式
+
+- HuggingFace Hub（`hf_repo`）：通过 `huggingface_hub` 下载
+- 直接 URL（`download_url`）：通过 `urllib` 下载并解压
+
+## 关键事实
+
+- 模型文件放在项目根目录 `models/` 下
+- Sherpa 模型不硬编码 URL——用户自行管理
+- NLLB 模型通过 `ModelManager.download()` 下载
+- 下载在后台线程执行，通过回调通知进度

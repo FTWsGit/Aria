@@ -1,0 +1,51 @@
+---
+name: "pipeline"
+kind: "architecture"
+description: "音频捕获→Sherpa→翻译→UI 的管道架构。修改 pipeline.py 或音频/ASR/翻译流程时读。"
+alwaysApply: false
+---
+
+# 管道架构
+
+## 数据流
+
+```
+AudioCapture (WASAPI loopback / mic)
+    ↓ PCM float32 16kHz mono
+StreamingPipeline._on_audio → queue
+    ↓
+_process_loop (ASR 线程)
+    ↓ accept_waveform + decode_stream
+SherpaTranscriber.process_audio
+    ↓ 返回累计文本
+_translation_loop (翻译线程，可选)
+    ↓ TranslationStateManager.process_text
+SubtitleEvent → UI
+```
+
+## 两层线程
+
+- **ASR 线程**（`_process_loop`）：高频，本地 C++ 调用，不阻塞
+- **翻译线程**（`_translation_loop`）：低频，可能阻塞（网络调用），通过 `_new_text_event` 和 `_text_lock` 异步消费最新文本
+
+## 模型发现
+
+`pipeline.py` 的 `_discover_model_paths()` 在 `models/` 目录下自动搜索：
+- `*encoder*.onnx`
+- `*decoder*.onnx`
+- `*joiner*.onnx`
+- `tokens.txt`
+
+支持子目录搜索（提取后的模型目录）。
+
+## 与翻译的交互
+
+- 无翻译时：ASR 线程直接 emit `SubtitleEvent`
+- 有翻译时：ASR 线程只更新 `_latest_raw_text`，翻译线程负责 emit 带 `committed_translation`/`draft_translation` 的 `SubtitleEvent`
+
+## 不变式
+
+- `_audio_queue` 无界但靠 timeout 0.1s 自然限速
+- `_latest_raw_text` 只在 ASR 线程写入，翻译线程读取
+- `_new_text_event` 防止翻译线程空转
+- 停止时先设 `_running = False`，再 set event 唤醒翻译线程

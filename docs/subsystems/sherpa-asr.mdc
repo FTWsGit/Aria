@@ -1,0 +1,52 @@
+---
+name: "sherpa-asr"
+kind: "subsystem"
+description: "Sherpa-ONNX 流式识别。修改 transcription/sherpa_transcriber.py 时读。"
+alwaysApply: false
+---
+
+# Sherpa-ONNX 流式识别
+
+## 职责
+
+封装 Sherpa-ONNX `OnlineRecognizer`，提供真正的流式 ASR。
+
+## 接口
+
+```python
+transcriber = SherpaTranscriber(
+    encoder="path/to/encoder.onnx",
+    decoder="path/to/decoder.onnx",
+    joiner="path/to/joiner.onnx",
+    tokens="path/to/tokens.txt",
+    num_threads=4,
+    feature_dim=80,
+    decoding_method="greedy_search",
+)
+```
+
+- `process_audio(audio: np.ndarray) -> str`：输入 float32 16kHz 音频，返回累计识别文本
+- `reset()`：重置识别器状态
+- `get_final_result() -> str`：flush 尾部并返回最终结果
+
+## 内部流程
+
+```python
+stream.accept_waveform(16000, audio)
+while recognizer.is_ready(stream):
+    recognizer.decode_stream(stream)
+result = recognizer.get_result(stream)
+```
+
+## 关键事实
+
+- 长期持有同一个 stream，不因静音 reset
+- 16 kHz 单声道 float32
+- 使用 `from_transducer` 创建 recognizer（transducer 架构）
+- 不硬编码模型 URL——模型路径由调用方传入
+- `SHERPA_AVAILABLE` 在模块加载时设置，导入失败时为 False
+
+## 历史
+
+- 曾同时支持 Vosk 和 Sherpa，Vosk 已在统一重构中移除
+- 曾硬编码中文/英文模型 URL，已改为显式路径传入

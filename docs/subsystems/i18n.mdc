@@ -1,0 +1,38 @@
+---
+name: "i18n"
+kind: "subsystem"
+description: "国际化/本地化。修改 i18n/ 时读。"
+alwaysApply: false
+---
+
+# 国际化
+
+## 职责
+
+多语言 UI 文本翻译。
+
+## 支持语言
+
+- `zh_TW`（默认）
+- `zh_CN`
+- `en`
+
+## 用法
+
+```python
+from aria.i18n import t, set_language
+text = t("key_name")
+set_language("en")
+```
+
+## 翻译文件
+
+- `i18n/zh_TW.py`：`TRANSLATIONS` 字典
+- `i18n/zh_CN.py`：同上
+- `i18n/en.py`：同上
+
+## 不变式
+
+- 存在翻译 key 时不硬编码用户可见字符串
+- 新增 key 需在所有语言文件中同步添加
+- 语言切换需重启生效

@@ -1,0 +1,42 @@
+---
+name: "audio-capture"
+kind: "subsystem"
+description: "Windows WASAPI 音频捕获。修改 audio/capture.py 时读。"
+alwaysApply: false
+---
+
+# 音频捕获
+
+## 职责
+
+通过 WASAPI loopback 捕获系统音频，或通过麦克风输入捕获语音。
+
+## 接口
+
+```python
+capture = AudioCapture(source="system")  # 或 "mic:default" / "mic:<index>"
+capture.start(callback=lambda audio, sr: ...)
+capture.stop()
+```
+
+- `source="system"`：WASAPI loopback（系统播放的声音）
+- `source="mic:default"`：默认麦克风
+- `source="mic:<index>"`：指定麦克风设备索引
+
+## 输出格式
+
+- float32 numpy array
+- 16 kHz 单声道
+- 100ms chunks（`CHUNK_DURATION_MS = 100`）
+
+## 内部流程
+
+1. PyAudio 回调线程接收原始音频 → `_audio_queue`
+2. `_process_audio_loop` 线程消费队列：bytes → float32 → 立体声转单声道 → 重采样到 16kHz → 调用用户 callback
+
+## 关键事实
+
+- 使用 `pyaudiowpatch`（支持 WASAPI loopback）
+- 设备枚举和默认设备变更需注意资源清理
+- 停止时 `terminate()` PyAudio 实例
+- 不依赖 VAD——音频直接输出给下游

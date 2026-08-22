@@ -1,0 +1,33 @@
+---
+name: "livecaptions"
+kind: "subsystem"
+description: "Windows 11 内建字幕集成。修改 livecaptions/ 时读。"
+alwaysApply: false
+---
+
+# Windows 内建字幕
+
+## 职责
+
+通过 UI Automation 读取 Windows 11 内建 Live Captions 窗口的文本，作为 ASR 输入。
+
+## 组件
+
+| 文件 | 职责 |
+|---|---|
+| `pipeline.py` | `LiveCaptionsPipeline`：启动、监控、去重、翻译 |
+| `monitor.py` | `LiveCaptionsMonitor`：轮询 Windows LiveCaptions 窗口文本 |
+| `controller.py` | `LiveCaptionsController`：启动（Win+Ctrl+L）、最小化、隐藏、检测 |
+| `manager.py` | `TranslationStateManager`：翻译状态机（与实时管道共享） |
+
+## 依赖
+
+- `pywinauto` / `uiautomation`：UI Automation
+- `pyautogui`：模拟按键启动 Live Captions
+- `comtypes`：COM 互操作
+
+## 不变式
+
+- 仅 Windows 11 22H2+ 可用
+- 原文由 Windows 显示，ARIA 只负责翻译
+- TranslationStateManager 与实时管道共享同一套逻辑
