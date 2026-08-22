@@ -6,7 +6,6 @@ TRANSLATIONS = {
     "subtitle": "实时语音转文字工具",
     # Language selector
     "language": "语言",
-    "lang_zh_TW": "繁體中文",
     "lang_zh_CN": "简体中文",
     "lang_en": "English",
     # Recognition settings

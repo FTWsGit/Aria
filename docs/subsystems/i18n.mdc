@@ -13,7 +13,6 @@ alwaysApply: false
 
 ## 支持语言
 
-- `zh_TW`（默认）
 - `zh_CN`
 - `en`
 
@@ -27,8 +26,7 @@ set_language("en")
 
 ## 翻译文件
 
-- `i18n/zh_TW.py`：`TRANSLATIONS` 字典
-- `i18n/zh_CN.py`：同上
+- `i18n/zh_CN.py`：`TRANSLATIONS` 字典
 - `i18n/en.py`：同上
 
 ## 不变式

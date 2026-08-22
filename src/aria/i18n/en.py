@@ -6,7 +6,6 @@ TRANSLATIONS = {
     "subtitle": "Real-time Speech-to-Text Tool",
     # Language selector
     "language": "Language",
-    "lang_zh_TW": "繁體中文",
     "lang_zh_CN": "简体中文",
     "lang_en": "English",
     # Recognition settings

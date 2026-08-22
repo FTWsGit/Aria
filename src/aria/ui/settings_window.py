@@ -328,7 +328,7 @@ class SettingsWindow(QMainWindow):
         lang_options = [LANGUAGES[code][0] for code in LANGUAGES]
         self.lang_selector.addItems(lang_options)
         current_lang = get_current_language()
-        current_lang_name = LANGUAGES.get(current_lang, LANGUAGES["zh_TW"])[0]
+        current_lang_name = LANGUAGES.get(current_lang, LANGUAGES["zh_CN"])[0]
         self.lang_selector.setCurrentText(current_lang_name)
         self.lang_selector.currentTextChanged.connect(self._on_ui_language_change)
         self.lang_selector.setFixedWidth(120)

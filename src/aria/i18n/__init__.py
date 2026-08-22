@@ -9,11 +9,10 @@ from typing import Dict, Optional
 from aria.settings_manager import get_settings_manager
 
 # Import translation modules
-from . import en, zh_CN, zh_TW
+from . import en, zh_CN
 
 # Available languages
 LANGUAGES = {
-    "zh_TW": ("繁體中文", zh_TW.TRANSLATIONS),
     "zh_CN": ("简体中文", zh_CN.TRANSLATIONS),
     "en": ("English", en.TRANSLATIONS),
 }
@@ -40,7 +39,7 @@ def set_language(lang_code: str) -> None:
     Set the UI language.
 
     Args:
-        lang_code: Language code (zh_TW, zh_CN, en)
+        lang_code: Language code (zh_CN, en)
     """
     global _current_language, _translations
 
