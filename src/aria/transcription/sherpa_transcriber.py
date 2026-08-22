@@ -12,6 +12,7 @@ from ..logger import debug, info
 # Sherpa import with error handling
 try:
     import sherpa_onnx
+
     SHERPA_AVAILABLE = True
 except ImportError:
     SHERPA_AVAILABLE = False
@@ -91,7 +92,7 @@ class SherpaTranscriber:
 
         # Get result - sherpa returns string directly
         result = self._recognizer.get_result(self._stream)
-        text = result.strip() if isinstance(result, str) else getattr(result, 'text', '').strip()
+        text = result.strip() if isinstance(result, str) else getattr(result, "text", "").strip()
 
         return text
 
@@ -109,5 +110,5 @@ class SherpaTranscriber:
             self._recognizer.decode_stream(self._stream)
 
         result = self._recognizer.get_result(self._stream)
-        text = result.strip() if isinstance(result, str) else getattr(result, 'text', '').strip()
+        text = result.strip() if isinstance(result, str) else getattr(result, "text", "").strip()
         return text

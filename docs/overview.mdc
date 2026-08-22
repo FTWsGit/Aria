@@ -12,7 +12,8 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 ## 识别路径
 
 两条路径：
-- **Sherpa-ONNX 流式识别**（实时模式）：音频直通 Sherpa OnlineRecognizer，无 VAD，无分段
+- **Sherpa-ONNX 流式识别**（`asr_streaming`）：音频直通 Sherpa OnlineRecognizer，无 VAD，无分段
+- **Whisper HTTP 分段识别**（`asr_chunked`）：攒块发送到兼容 OpenAI `/v1/audio/transcriptions` 的服务（whisper-server 等）
 - **Windows 11 内建字幕**（Live Captions 模式）
 
 ## 仓库结构
@@ -20,34 +21,38 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 | 目录 | 职责 |
 |---|---|
 | `src/aria/audio/` | Windows WASAPI 音频捕获 |
-| `src/aria/transcription/` | ASR 后端（仅 Sherpa-ONNX） |
+| `src/aria/transcription/` | ASR 后端（Sherpa-ONNX、whisper-http） |
 | `src/aria/translation/` | 翻译提供者（Google / Bing / Youdao / OpenAI-compatible） |
 | `src/aria/ui/` | PyQt6 窗口、悬浮窗、设置、托盘 |
 | `src/aria/livecaptions/` | Windows 内建字幕集成 |
-| `src/aria/model_manager/` | 模型发现/下载/配置 |
-| `src/aria/pipeline.py` | Sherpa-ONNX 流式管道 |
+| `src/aria/model_manager/` | 模型注册表 + 下载 + 配置 |
+| `src/aria/pipeline.py` | 多后端流式管道 |
 | `src/aria/settings_manager.py` | JSON 持久化设置 |
 | `src/aria/logger.py` | 应用日志和转录日志 |
-| `models/` | 本地模型文件（用户自行管理） |
+| `models/` | ASR 模型 YAML 配置（git 跟踪） |
+| `models_cache/` | 下载的模型权重（gitignore） |
 
 ## 数据流
 
 ```
-AudioCapture → PCM chunks → Sherpa-ONNX OnlineRecognizer → partial result → UI
+AudioCapture → PCM chunks → StreamingPipeline (按 kind 分发)
+    ├── asr_streaming: SherpaOnnxBackend.process_audio → partial result
+    └── asr_chunked: 攒块 → WhisperHttpBackend.transcribe → 完整结果
                                                     ↓
                                               TranslationStateManager → 翻译 → UI
 ```
 
-- 无 VAD，无分段，音频直通 ASR
+- 无 VAD，无分段（`asr_streaming` 路径），音频直通 ASR
+- `asr_chunked` 路径按时间攒块
 - 翻译独立于 ASR，异步执行
 - 持续产生 partial result，不等待句子结束
 
 ## 核心规则
 
-1. ASR 后端统一为 Sherpa-ONNX，不添加新后端
+1. ASR 后端通过 `models/*.yaml` 配置驱动，支持 Sherpa-ONNX 多架构和 whisper-http
 2. 翻译独立于 ASR，一份转录可发送到多个翻译提供者
 3. 实时路径不使用 VAD 或分段
-4. 模型文件由用户自行管理，放置在 `models/` 目录，管道自动发现
+4. 模型配置（yaml）放在 `models/`，权重放在 `models_cache/`；下载由用户在 Model Manager 中手动触发
 5. 使用 uv 管理依赖，所有命令用 `uv run`
 6. 使用中文交流
 

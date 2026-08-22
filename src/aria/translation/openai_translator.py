@@ -1,6 +1,5 @@
 """OpenAI-compatible translator using the official openai package."""
 
-
 from ..logger import debug, info
 
 
@@ -36,7 +35,9 @@ class OpenAITranslator:
             "- 不应该有翻译腔"
             "- 尽量使用短句，而不是复杂长句"
         )
-        info(f"OpenAITranslator initialized: endpoint={endpoint}, model={model_name or 'default'}, target={target_language}")
+        info(
+            f"OpenAITranslator initialized: endpoint={endpoint}, model={model_name or 'default'}, target={target_language}"
+        )
 
     def translate(self, text: str) -> str:
         if not text.strip():

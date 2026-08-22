@@ -8,6 +8,7 @@ from ..logger import debug, info, warning
 TRANSLATORS_AVAILABLE = False
 try:
     import importlib.util
+
     if importlib.util.find_spec("translators") is not None:
         TRANSLATORS_AVAILABLE = True
         debug("translators library available (delayed import)")
@@ -18,6 +19,7 @@ except Exception as e:
 # Google Translate support (using googletrans library)
 try:
     from googletrans import Translator as GoogleTranslatorBase
+
     GOOGLETRANS_AVAILABLE = True
 except ImportError:
     GOOGLETRANS_AVAILABLE = False
@@ -27,14 +29,14 @@ except ImportError:
 class GoogleTranslator:
     """
     Google Translate wrapper using googletrans library.
-    
+
     Features:
     - Free (unofficial API)
     - No model download required
     - High quality translation
     - Note: May be unstable due to rate limiting
     """
-    
+
     # Language code mapping (display name -> googletrans code)
     LANGUAGE_CODES = {
         "繁體中文": "zh-tw",
@@ -46,7 +48,7 @@ class GoogleTranslator:
         "法文": "fr",
         "德文": "de",
     }
-    
+
     # Source language mapping
     SOURCE_LANG_MAP = {
         "zh": "zh-cn",
@@ -54,22 +56,22 @@ class GoogleTranslator:
         "en": "en",
         "ko": "ko",
     }
-    
+
     def __init__(self, target_language: str = "zh-tw"):
         """
         Initialize Google Translator.
-        
+
         Args:
             target_language: Target language code (e.g., "zh-tw", "en")
         """
         if not GOOGLETRANS_AVAILABLE:
             raise ImportError("googletrans is required. Run: pip install googletrans==4.0.0-rc1")
-        
+
         self._translator = GoogleTranslatorBase()
         self.target_language = target_language
         self._lock = threading.Lock()
         info(f"GoogleTranslator initialized with target={target_language}")
-    
+
     def translate(
         self,
         text: str,
@@ -78,36 +80,36 @@ class GoogleTranslator:
     ) -> str:
         """
         Translate text using Google Translate.
-        
+
         Args:
             text: Text to translate
             source_language: Source language code (optional)
             target_language: Target language code (overrides default)
-        
+
         Returns:
             Translated text
         """
         if not text or not text.strip():
             return ""
-        
+
         target = target_language or self.target_language
         src = self.SOURCE_LANG_MAP.get(source_language, "auto") if source_language else "auto"
-        
+
         with self._lock:
             try:
                 result = self._translator.translate(text, src=src, dest=target)
                 translated = result.text
-                
+
                 return translated
             except Exception as e:
                 warning(f"GoogleTranslator error: {e}")
                 return ""
-    
+
     def set_target_language(self, language: str) -> None:
         """Set the target language."""
         self.target_language = language
         debug(f"GoogleTranslator target language set to: {language}")
-    
+
     @classmethod
     def get_language_code(cls, display_name: str) -> str:
         """Get Google Translate language code from display name."""
@@ -118,17 +120,17 @@ class TranslatorsLibWrapper:
     """
     Wrapper for translators library (multi-engine web scraper).
     Supports Google, Baidu, Youdao, Bing, Alibaba, and more.
-    
+
     Warning: This uses web scraping and may be unstable or blocked.
     """
-    
+
     # Language code mapping (NLLB format -> translators format)
     # Different engines may use different codes
     LANGUAGE_CODES = {
         # Google and most engines
         "google": {
             "zho_Hant": "zh-TW",
-            "zho_Hans": "zh-CN", 
+            "zho_Hans": "zh-CN",
             "eng_Latn": "en",
             "jpn_Jpan": "ja",
             "kor_Hang": "ko",
@@ -146,7 +148,7 @@ class TranslatorsLibWrapper:
         # Bing uses different codes
         "bing": {
             "zho_Hant": "zh-Hant",
-            "zho_Hans": "zh-Hans", 
+            "zho_Hans": "zh-Hans",
             "eng_Latn": "en",
             "jpn_Jpan": "ja",
             "kor_Hang": "ko",
@@ -164,7 +166,7 @@ class TranslatorsLibWrapper:
         # Youdao only supports Chinese-English translation
         "youdao": {
             "zho_Hant": "zh-CHS",  # Only simplified Chinese supported
-            "zho_Hans": "zh-CHS", 
+            "zho_Hans": "zh-CHS",
             "eng_Latn": "en",
             "jpn_Jpan": "en",  # Other languages fallback to English
             "kor_Hang": "en",
@@ -180,14 +182,14 @@ class TranslatorsLibWrapper:
             "ind_Latn": "en",
         },
     }
-    
+
     # Supported engines
     ENGINES = {
         "google": "Google (Free)",
         "bing": "Bing",
         "youdao": "有道翻譯 (中英互譯)",
     }
-    
+
     def __init__(
         self,
         engine: str = "google",
@@ -195,24 +197,22 @@ class TranslatorsLibWrapper:
     ):
         """
         Initialize translators library wrapper.
-        
+
         Args:
             engine: Engine name ("google", "baidu", "youdao", "bing", "alibaba")
             target_language: Target language code (NLLB format)
         """
         if not TRANSLATORS_AVAILABLE:
-            raise ImportError(
-                "translators library is required. Run: pip install translators"
-            )
-        
+            raise ImportError("translators library is required. Run: pip install translators")
+
         self.engine = engine
         # Get language code based on engine
         lang_map = self.LANGUAGE_CODES.get(engine, self.LANGUAGE_CODES["google"])
         self.target_language = lang_map.get(target_language, "zh-TW")
         self._lock = threading.Lock()
-        
+
         info(f"TranslatorsLib initialized: engine={engine}, target={self.target_language}")
-    
+
     def translate(
         self,
         text: str,
@@ -221,47 +221,47 @@ class TranslatorsLibWrapper:
     ) -> str:
         """
         Translate text using selected engine.
-        
+
         Args:
             text: Text to translate
             source_language: Source language code (optional, auto-detect)
             target_language: Target language code (overrides default)
-        
+
         Returns:
             Translated text
         """
         if not text or not text.strip():
             return ""
-        
+
         target = target_language or self.target_language
-        
+
         # Lazy import translators to avoid conflicts
         import translators as ts
-        
+
         with self._lock:
             try:
                 # Map engine name to translators library function
                 if self.engine == "google":
-                    result = ts.translate_text(text, to_language=target, translator='google')
+                    result = ts.translate_text(text, to_language=target, translator="google")
                 elif self.engine == "bing":
-                    result = ts.translate_text(text, to_language=target, translator='bing')
+                    result = ts.translate_text(text, to_language=target, translator="bing")
                 elif self.engine == "youdao":
-                    result = ts.translate_text(text, to_language=target, translator='youdao')
+                    result = ts.translate_text(text, to_language=target, translator="youdao")
                 else:
                     warning(f"Unknown engine: {self.engine}, falling back to Google")
-                    result = ts.translate_text(text, to_language=target, translator='google')
-                
+                    result = ts.translate_text(text, to_language=target, translator="google")
+
                 return result
             except Exception as e:
                 warning(f"TranslatorsLib ({self.engine}) error: {e}")
                 return ""
-    
+
     def set_target_language(self, language: str) -> None:
         """Set the target language."""
         lang_map = self.LANGUAGE_CODES.get(self.engine, self.LANGUAGE_CODES["google"])
         self.target_language = lang_map.get(language, language)
         debug(f"TranslatorsLib target language set to: {self.target_language}")
-    
+
     @classmethod
     def get_language_code(cls, nllb_code: str, engine: str = "google") -> str:
         """Get translators language code from NLLB code."""
@@ -290,14 +290,15 @@ def create_translator(engine: str = "bing", target_language: str = "zho_Hant", *
         return TranslatorsLibWrapper(engine=ts_engine, target_language=target_language)
     elif engine == "openai":
         from .openai_translator import OpenAITranslator
+
         return OpenAITranslator(
             endpoint=kwargs.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
-            api_key=kwargs.get("openai_api_key", None) or None,
+            api_key=kwargs.get("openai_api_key") or None,
             model_name=kwargs.get("openai_model_name", ""),
             target_language=target_language,
             temperature=kwargs.get("openai_temperature", 0.2),
             max_tokens=kwargs.get("openai_max_tokens", 1024),
-            system_prompt=kwargs.get("openai_system_prompt", None) or None,
+            system_prompt=kwargs.get("openai_system_prompt") or None,
         )
     else:
         raise ValueError(f"Unknown translation engine: {engine}")
@@ -306,7 +307,7 @@ def create_translator(engine: str = "bing", target_language: str = "zho_Hant", *
 # Quick test
 if __name__ == "__main__":
     print("Testing Translators...")
-    
+
     # Test Google
     if GOOGLETRANS_AVAILABLE:
         try:

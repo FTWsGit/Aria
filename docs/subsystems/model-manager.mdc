@@ -1,7 +1,7 @@
 ---
 name: "model-manager"
 kind: "subsystem"
-description: "模型下载/发现/配置。修改 model_manager/ 时读。"
+description: "模型注册表+下载+配置。修改 model_manager/ 时读。"
 alwaysApply: false
 ---
 
@@ -9,19 +9,45 @@ alwaysApply: false
 
 ## 职责
 
-管理模型下载、状态查询、本地路径。
+`ModelRegistry` 扫描 yaml 配置构建模型列表；`ModelManager` 管理下载、状态查询、本地路径。
 
-## 模型类型
+## 模型注册表
 
-- `ModelType.SHERPA`：Sherpa-ONNX ASR 模型
+`ModelRegistry(models_dir)` 扫描 `models/*.yaml`，构建 `ModelSpec` 索引：
+
+- `ModelSpec` 包含 `id`、`kind`（`asr_streaming` / `asr_chunked`）、`backend`、`display_name`、`language`、`source`、`params`、`raw`
+- `list(kind)` 按类型筛选，`get(model_id)` 按 ID 获取
+- 绝不触发下载
+
+## 目录结构
+
+| 目录 | 内容 | git |
+|---|---|---|
+| `models/` | yaml 配置文件 | 跟踪 |
+| `models_cache/<model_id>/` | 下载的权重文件 | gitignore |
 
 ## 下载方式
 
-- HuggingFace Hub（`hf_repo`）：通过 `huggingface_hub` 下载
-- 直接 URL（`download_url`）：通过 `urllib` 下载并解压
+按 `source.type` 分发：
+
+| type | 实现 |
+|---|---|
+| `huggingface` | `huggingface_hub.snapshot_download` |
+| `modelscope` | `modelscope.snapshot_download` |
+| `url_zip` / `url_tar` | `urllib` 下载 + 解压 |
+| `manual` | 本地路径，不下载 |
+
+## 关键方法
+
+- `ModelManager(registry)` 接收 `ModelRegistry` 实例
+- `get_model_path(spec)` 返回 `ModelSpec` 对应的本地路径（manual 类型直接返回 `source.path`，其他返回 `cache_dir / spec.id`）
+- `is_downloaded(spec)` 检查权重文件是否已完整下载
+- `get_status(spec)` 返回 `ModelStatus`（NOT_DOWNLOADED / DOWNLOADING / DOWNLOADED / ERROR）
+- `download(spec, callback)` 后台线程下载，必须由 UI 按钮触发
 
 ## 关键事实
 
-- 模型文件放在项目根目录 `models/` 下
-- Sherpa 模型不硬编码 URL——用户自行管理
-- 翻译模型不再由 Aria 管理——用户自行在外部起 LLM server 或使用在线机翻
+- 模型配置（yaml）放在 `models/`，权重放在 `models_cache/`
+- 不自动下载任何模型——下载必须由用户在 Model Manager 中点击触发
+- `StreamingPipeline` 启动前调用 `is_downloaded()` 检查，未下载则抛错
+- 翻译模型不再由 Aria 管理

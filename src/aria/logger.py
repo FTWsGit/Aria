@@ -96,39 +96,38 @@ def get_log_dir() -> Path:
 def setup_logger(name: str = "ARIA", level: int = logging.DEBUG) -> logging.Logger:
     """
     Set up and return the application logger.
-    
+
     Args:
         name: Logger name
         level: Logging level (default: DEBUG)
-    
+
     Returns:
         Configured logger instance
     """
     global _logger
-    
+
     if _logger is not None:
         return _logger
-    
+
     _logger = logging.getLogger(name)
     _logger.setLevel(level)
-    
+
     # Prevent duplicate handlers
     if _logger.handlers:
         return _logger
 
     # Log format
     formatter = _ConsoleModeFormatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
-    
+
     # Console handler (INFO and above)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
     console_handler.addFilter(_ConsoleModeFilter())
     _logger.addHandler(console_handler)
-    
+
     # Detailed file handler (new file per app run)
     log_dir = get_log_dir()
     ts = now_in_app_timezone().strftime("%Y%m%d_%H%M%S")
@@ -138,16 +137,16 @@ def setup_logger(name: str = "ARIA", level: int = logging.DEBUG) -> logging.Logg
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     _logger.addHandler(file_handler)
-    
+
     _logger.info(f"Logger initialized. Log file: {log_file}")
-    
+
     return _logger
 
 
 def get_logger() -> logging.Logger:
     """
     Get the application logger.
-    
+
     Returns:
         Logger instance (creates one if not exists)
     """

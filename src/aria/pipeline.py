@@ -1,16 +1,14 @@
 """
 Streaming Pipeline for real-time transcription.
 
-Uses Sherpa-ONNX OnlineRecognizer for pure streaming ASR.
-Audio flows directly from capture → Sherpa → partial results → UI.
-No VAD, no segmentation, no multi-backend routing.
+Config-driven pipeline that supports multiple ASR backends via ModelRegistry.
+Supports streaming (Sherpa-ONNX) and chunked (whisper-http) modes.
 """
 
 import queue
 import threading
 import time
 from collections.abc import Callable
-from pathlib import Path
 
 import numpy as np
 
@@ -18,12 +16,17 @@ from .audio.capture import AudioCapture
 from .events import SubtitleEvent
 from .logger import debug, info, transcript, warning
 
-# Import Sherpa transcriber
-from .transcription.sherpa_transcriber import SHERPA_AVAILABLE, SherpaTranscriber
+# Import ASR backends and model registry
+from .model_manager.manager import ModelManager
+from .model_manager.registry import ModelRegistry
+from .transcription.base import ChunkedASR, StreamingASR
+from .transcription.sherpa_onnx import SherpaOnnxBackend
+from .transcription.whisper_http import WhisperHttpBackend
 
 # Translation support (optional)
 try:
     from .translation.translator import GOOGLETRANS_AVAILABLE, TRANSLATORS_AVAILABLE, create_translator
+
     TRANSLATION_AVAILABLE = TRANSLATORS_AVAILABLE or GOOGLETRANS_AVAILABLE
     debug(f"Translation module loaded, TRANSLATORS={TRANSLATORS_AVAILABLE}, GOOGLE={GOOGLETRANS_AVAILABLE}")
 except ImportError as e:
@@ -34,66 +37,26 @@ except ImportError as e:
 # TranslationStateManager for incremental translation
 from .livecaptions.manager import TranslationStateManager
 
-
-def _discover_model_paths(model_dir: str | None = None) -> tuple:
-    """Discover Sherpa model files in the given directory.
-
-    Looks for files matching *encoder*.onnx, *decoder*.onnx, *joiner*.onnx, tokens.txt.
-    """
-    if model_dir is None:
-        current = Path(__file__).resolve()
-        project_root = current.parent.parent.parent
-        search_dir = project_root / "models"
-    else:
-        search_dir = Path(model_dir)
-
-    if not search_dir.is_dir():
-        raise FileNotFoundError(
-            f"Model directory not found: {search_dir}\n"
-            f"Please place Sherpa-ONNX model files (encoder.onnx, decoder.onnx, joiner.onnx, tokens.txt) in {search_dir}"
-        )
-
-    def _find_in_dir(directory: Path, pattern: str) -> str:
-        matches = sorted(directory.glob(pattern))
-        if matches:
-            return str(matches[0])
-        # Also search one level deep (for extracted model subdirectories)
-        for sub in directory.iterdir():
-            if sub.is_dir():
-                sub_matches = sorted(sub.glob(pattern))
-                if sub_matches:
-                    return str(sub_matches[0])
-        raise FileNotFoundError(
-            f"Could not find '{pattern}' in {directory}\n"
-            f"Please ensure your Sherpa-ONNX model files are in this directory."
-        )
-
-    encoder = _find_in_dir(search_dir, "*encoder*.onnx")
-    decoder = _find_in_dir(search_dir, "*decoder*.onnx")
-    joiner = _find_in_dir(search_dir, "*joiner*.onnx")
-    tokens = _find_in_dir(search_dir, "tokens.txt")
-
-    info(f"Discovered model: encoder={Path(encoder).name}, decoder={Path(decoder).name}")
-    return encoder, decoder, joiner, tokens
+ASR_BACKENDS = {
+    "sherpa_onnx": SherpaOnnxBackend,
+    "whisper_http": WhisperHttpBackend,
+}
 
 
 class StreamingPipeline:
     """
-    Pure streaming transcription pipeline using Sherpa-ONNX.
+    Config-driven streaming ASR pipeline.
 
-    Audio flows continuously:
-        AudioCapture → Sherpa OnlineRecognizer → partial results → UI
-
-    No VAD, no speech segmentation, no multi-backend routing.
+    Supports multiple backends and modes:
+    - Streaming mode: process audio frame-by-frame (Sherpa-ONNX).
+    - Chunked mode: accumulate audio then transcribe chunks (whisper-http).
     """
 
     def __init__(
         self,
-        encoder: str | None = None,
-        decoder: str | None = None,
-        joiner: str | None = None,
-        tokens: str | None = None,
-        model_dir: str | None = None,
+        model_id: str,
+        registry: ModelRegistry,
+        model_manager: ModelManager,
         on_subtitle: Callable[[SubtitleEvent], None] | None = None,
         max_lines: int = 4,
         # Translation settings
@@ -113,11 +76,9 @@ class StreamingPipeline:
         Initialize the streaming pipeline.
 
         Args:
-            encoder: Path to encoder ONNX model (auto-discovered if model_dir is set)
-            decoder: Path to decoder ONNX model (auto-discovered if model_dir is set)
-            joiner: Path to joiner ONNX model (auto-discovered if model_dir is set)
-            tokens: Path to tokens.txt (auto-discovered if model_dir is set)
-            model_dir: Directory to auto-discover model files (default: models/)
+            model_id: Model ID to look up in the registry
+            registry: ModelRegistry for discovering model configurations
+            model_manager: ModelManager for checking download status
             on_subtitle: Callback for subtitle events
             max_lines: Maximum lines to display
             enable_translation: Whether to enable translation
@@ -131,21 +92,25 @@ class StreamingPipeline:
         self.translation_engine = translation_engine
         self.target_language = target_language
 
-        # Auto-discover model paths if not explicitly provided
-        if encoder and decoder and joiner and tokens:
-            pass  # Use explicit paths
+        # Look up model spec from registry
+        spec = registry.get(model_id)
+
+        # Check if model files are downloaded (never auto-download!)
+        model_root = model_manager.get_model_path(spec)
+        if not model_manager.is_downloaded(spec):
+            raise RuntimeError(f"Model '{model_id}' is not downloaded yet. Please download it in Model Manager first.")
+
+        # Dispatch by kind
+        if spec.kind == "asr_streaming":
+            backend_cls = ASR_BACKENDS[spec.backend]
+            self._transcriber: StreamingASR = backend_cls(spec, model_root)
+            self._mode = "streaming"
+        elif spec.kind == "asr_chunked":
+            backend_cls = ASR_BACKENDS[spec.backend]
+            self._transcriber: ChunkedASR = backend_cls(spec, model_root)
+            self._mode = "chunked"
         else:
-            encoder, decoder, joiner, tokens = _discover_model_paths(model_dir)
-
-        if not SHERPA_AVAILABLE:
-            raise ImportError("sherpa-onnx is required. Run: pip install sherpa-onnx")
-
-        self._transcriber = SherpaTranscriber(
-            encoder=encoder,
-            decoder=decoder,
-            joiner=joiner,
-            tokens=tokens,
-        )
+            raise ValueError(f"Unsupported ASR kind: {spec.kind}")
 
         # Translation (optional)
         self._translator = None
@@ -162,9 +127,7 @@ class StreamingPipeline:
                     openai_max_tokens=openai_max_tokens,
                     openai_system_prompt=openai_system_prompt,
                 )
-                self._state_manager = TranslationStateManager(
-                    translator=self._translator.translate
-                )
+                self._state_manager = TranslationStateManager(translator=self._translator.translate)
                 debug("StreamingPipeline: TranslationStateManager initialized")
             except Exception as e:
                 warning(f"Translation init failed: {e}")
@@ -186,7 +149,7 @@ class StreamingPipeline:
         self._translation_thread: threading.Thread | None = None
 
         trans_status = "enabled (incremental)" if self._state_manager else "disabled"
-        info(f"StreamingPipeline: Sherpa-ONNX, translation={trans_status}")
+        info(f"StreamingPipeline: mode={self._mode}, backend={spec.backend}, translation={trans_status}")
 
     def _default_callback(self, event: SubtitleEvent) -> None:
         """Default subtitle callback."""
@@ -207,8 +170,27 @@ class StreamingPipeline:
             except queue.Empty:
                 continue
 
-            # Process with Sherpa (fast, local C++ call)
-            raw_text = self._transcriber.process_audio(audio)
+            # Dispatch by mode
+            if self._mode == "streaming":
+                raw_text = self._transcriber.process_audio(audio)
+            elif self._mode == "chunked":
+                if not hasattr(self, "_chunk_buffer"):
+                    self._chunk_buffer = []
+                    self._chunk_samples = 0
+                self._chunk_buffer.append(audio)
+                self._chunk_samples += len(audio)
+
+                chunk_seconds = getattr(self._transcriber, "chunk_seconds", 2.0)
+                chunk_samples_needed = int(16000 * chunk_seconds)
+                if self._chunk_samples < chunk_samples_needed:
+                    continue
+
+                combined = np.concatenate(self._chunk_buffer)
+                self._chunk_buffer = []
+                self._chunk_samples = 0
+                raw_text = self._transcriber.transcribe(combined, 16000)
+            else:
+                raw_text = ""
 
             # Check for changes to avoid redundant updates
             if not raw_text or raw_text == self._latest_raw_text:
@@ -290,25 +272,19 @@ class StreamingPipeline:
             self._state_manager.reset()
 
         # Start threads
-        self._process_thread = threading.Thread(
-            target=self._process_loop,
-            daemon=True,
-            name="StreamingPipeline_ASR"
-        )
+        self._process_thread = threading.Thread(target=self._process_loop, daemon=True, name="StreamingPipeline_ASR")
         self._process_thread.start()
 
         if self._state_manager:
             self._translation_thread = threading.Thread(
-                target=self._translation_loop,
-                daemon=True,
-                name="StreamingPipeline_Translation"
+                target=self._translation_loop, daemon=True, name="StreamingPipeline_Translation"
             )
             self._translation_thread.start()
 
         # Start audio capture
         self._audio_capture.start(callback=self._on_audio)
 
-        info("StreamingPipeline started (Sherpa-ONNX)")
+        info("StreamingPipeline started")
 
     def stop(self) -> None:
         """Stop the pipeline."""

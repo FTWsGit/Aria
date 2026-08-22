@@ -3,6 +3,7 @@
 uv.lock
 __pycache__/
 .ruff_cache/
+.pytest_cache/
 
 # IDE
 .vscode/
@@ -10,8 +11,9 @@ __pycache__/
 # logs
 logs/
 
-# runtime
+# models
 models/
+models_cache/
 
 # agent
 .temp/

@@ -26,6 +26,9 @@ dependencies = [
     "pillow>=10.0.0",
     "sherpa-onnx>=1.10.0",
     "openai>=1.0.0",
+    "pyyaml>=6.0",
+    "huggingface_hub>=0.20.0",
+    "requests>=2.28.0",
     # LiveCaptions mode dependencies
     "pywinauto>=0.6.8",
     "uiautomation>=2.0.0",
@@ -57,5 +60,33 @@ build-backend = "hatchling.build"
 packages = ["src/aria"]
 
 [tool.ruff]
-line-length = 120
-target-version = "py310"
+target-version = "py311"
+line-length = 120 
+
+include = ["src/**/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort (import 排序)
+    "N",   # pep8-naming (命名规范)
+    "UP",  # pyupgrade (过时语法升级)
+    "B",   # flake8-bugbear (常见 bug)
+    "C4",  # flake8-comprehensions (推导式优化)
+    "SIM", # flake8-simplify (简化建议)
+]
+ignore = [
+    "E501",   # 行太长 — GUI 里 tkinter 布局代码经常超长
+    "N802",   # 函数名小写 — tkinter callback 有时用驼峰
+    "N803",   # 参数名小写
+    "N806",   # 局部变量大写 — 常量放函数里时常见
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/aria/i18n/*.py" = ["N999"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

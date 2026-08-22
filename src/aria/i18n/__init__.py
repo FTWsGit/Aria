@@ -38,18 +38,18 @@ def get_current_language() -> str:
 def set_language(lang_code: str) -> None:
     """
     Set the UI language.
-    
+
     Args:
         lang_code: Language code (zh_TW, zh_CN, en)
     """
     global _current_language, _translations
-    
+
     if lang_code not in LANGUAGES:
         lang_code = DEFAULT_LANGUAGE
-    
+
     _current_language = lang_code
     _translations = LANGUAGES[lang_code][1]
-    
+
     # Save to settings
     settings = get_settings_manager()
     settings.set("ui_language", lang_code)
@@ -59,37 +59,37 @@ def set_language(lang_code: str) -> None:
 def get_text(key: str, **kwargs) -> str:
     """
     Get translated text for a key.
-    
+
     Args:
         key: Translation key
         **kwargs: Format arguments for string interpolation
-        
+
     Returns:
         Translated string, or key if not found
     """
     global _translations
-    
+
     # Initialize translations if not loaded
     if not _translations:
         lang = get_current_language()
         _translations = LANGUAGES.get(lang, LANGUAGES[DEFAULT_LANGUAGE])[1]
-    
+
     text = _translations.get(key, key)
-    
+
     # Apply format arguments if provided
     if kwargs:
         try:
             text = text.format(**kwargs)
         except KeyError:
             pass
-    
+
     return text
 
 
 def get_language_options() -> list:
     """
     Get list of available languages for UI dropdown.
-    
+
     Returns:
         List of (display_name, code) tuples
     """

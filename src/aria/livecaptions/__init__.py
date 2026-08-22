@@ -10,8 +10,8 @@ from .monitor import CaptionEvent, LiveCaptionsMonitor
 from .pipeline import LiveCaptionsPipeline
 
 __all__ = [
-    'CaptionEvent',
-    'LiveCaptionsController',
-    'LiveCaptionsMonitor',
-    'LiveCaptionsPipeline',
+    "CaptionEvent",
+    "LiveCaptionsController",
+    "LiveCaptionsMonitor",
+    "LiveCaptionsPipeline",
 ]

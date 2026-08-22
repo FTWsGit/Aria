@@ -35,7 +35,8 @@ uv run aria
 始终使用 uv。提交前先跑最相关的检查，再跑完整套件：
 
 ```powershell
-uv run ruff check .
+uv run ruff format
+uv run ruff check --fix
 uv run pytest
 ```
 

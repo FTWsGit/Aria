@@ -11,6 +11,7 @@ from dataclasses import dataclass
 @dataclass
 class SubtitleEvent:
     """A subtitle event with text and metadata."""
+
     text: str
     language: str
     confidence: float

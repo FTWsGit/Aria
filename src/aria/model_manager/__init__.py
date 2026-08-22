@@ -2,18 +2,14 @@
 Model Manager module - Handles model downloading and management.
 """
 
-from .manager import (
-    SUPPORTED_MODELS,
-    ModelInfo,
-    ModelManager,
-    ModelStatus,
-    ModelType,
-)
+from .manager import ModelInfo, ModelManager, ModelStatus, ModelType
+from .registry import ModelRegistry, ModelSpec
 
 __all__ = [
-    "SUPPORTED_MODELS",
     "ModelInfo",
     "ModelManager",
+    "ModelRegistry",
+    "ModelSpec",
     "ModelStatus",
     "ModelType",
 ]
