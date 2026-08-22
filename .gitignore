@@ -86,3 +86,6 @@ tests/
 
 # lite version
 ARIA-v2-lite/
+
+# uv
+uv.lock
