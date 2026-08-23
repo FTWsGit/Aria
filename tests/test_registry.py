@@ -98,3 +98,48 @@ def test_spec_get_size_display():
     assert spec.get_size_display() == "500MB"
     spec.size_mb = 2048
     assert spec.get_size_display() == "2.0GB"
+
+
+def test_registry_invalid_yaml(tmp_path):
+    """Registry should raise KeyError for YAML missing required fields."""
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    # Missing "id" and "kind" — only "backend" present
+    yaml_content = {"backend": "sherpa_onnx"}
+    (models_dir / "invalid.yaml").write_text(yaml.dump(yaml_content), encoding="utf-8")
+    with pytest.raises(KeyError):
+        ModelRegistry(models_dir)
+
+
+def test_registry_empty_yaml(tmp_path):
+    """Registry should raise TypeError on empty YAML (yaml.safe_load returns None)."""
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    (models_dir / "empty.yaml").write_text("", encoding="utf-8")
+    with pytest.raises(TypeError):
+        ModelRegistry(models_dir)
+
+
+def test_registry_ignores_non_yaml(tmp_path):
+    """Registry should only load .yaml files, ignoring .txt and .json."""
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    # Write a valid .yaml file
+    yaml_content = {
+        "id": "yaml-model",
+        "kind": "asr_streaming",
+        "backend": "sherpa_onnx",
+        "display_name": "YAML Model",
+        "language": "zh",
+        "source": {},
+    }
+    (models_dir / "valid.yaml").write_text(yaml.dump(yaml_content), encoding="utf-8")
+    # Write a .txt file with the same content (should be ignored)
+    (models_dir / "fake.txt").write_text(yaml.dump(yaml_content), encoding="utf-8")
+    # Write a .json file (should be ignored)
+    (models_dir / "fake.json").write_text('{"id":"json-model","kind":"asr","backend":"x"}', encoding="utf-8")
+
+    registry = ModelRegistry(models_dir)
+    models = registry.list()
+    assert len(models) == 1
+    assert models[0].id == "yaml-model"

@@ -1,3 +1,6 @@
+from unittest.mock import MagicMock, patch
+
+import aria.i18n
 from aria.i18n.en import TRANSLATIONS as EN
 from aria.i18n.zh_CN import TRANSLATIONS as ZH_CN
 
@@ -14,16 +17,27 @@ def test_i18n_keys_aligned():
 
 def test_i18n_t_basic():
     """t() should return translated text for known keys."""
-    from aria.i18n import set_language, t
+    # Reset globals to avoid state leakage from other tests
+    aria.i18n._current_language = None
+    aria.i18n._translations = {}
 
-    set_language("zh_CN")
-    assert t("window_title") == "ARIA"
+    with patch("aria.i18n.get_settings_manager", return_value=MagicMock()):
+        set_language = aria.i18n.set_language
+        t = aria.i18n.t
 
-    set_language("en")
-    assert t("window_title") == "ARIA"
+        set_language("zh_CN")
+        assert t("window_title") == "ARIA"
+
+        set_language("en")
+        assert t("window_title") == "ARIA"
 
 
 def test_i18n_t_fallback():
     """t() should return key itself for unknown keys."""
-    from aria.i18n import t
-    assert t("nonexistent_key_xyz") == "nonexistent_key_xyz"
+    # Reset globals — this test is independent of test_i18n_t_basic
+    aria.i18n._current_language = None
+    aria.i18n._translations = {}
+
+    with patch("aria.i18n.get_settings_manager", return_value=MagicMock()):
+        t = aria.i18n.t
+        assert t("nonexistent_key_xyz") == "nonexistent_key_xyz"

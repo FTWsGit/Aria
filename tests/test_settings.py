@@ -7,7 +7,11 @@ from aria.settings_manager import SettingsManager
 
 def test_default_settings():
     """SettingsManager should start with default values."""
-    with patch.object(SettingsManager, "_load", return_value=None):
+    with (
+        patch("aria.logger.info"),
+        patch("aria.logger.warning"),
+        patch.object(SettingsManager, "_load", return_value=None),
+    ):
         sm = SettingsManager.__new__(SettingsManager)
         sm._config_dir = Path("/tmp/aria")
         sm._config_file = sm._config_dir / "settings.json"
@@ -30,7 +34,9 @@ def test_settings_merge_defaults(tmp_path):
     sm._config_dir = config_dir
     sm._config_file = config_file
     sm._settings = sm.DEFAULT_SETTINGS.copy()
-    sm._load()
+
+    with patch("aria.logger.info"), patch("aria.logger.warning"):
+        sm._load()
 
     assert sm.get("mode") == "livecaptions"
     # Default should still be present for keys not in saved file
@@ -39,7 +45,11 @@ def test_settings_merge_defaults(tmp_path):
 
 def test_settings_set_and_get(tmp_path):
     """set() and get() should work correctly."""
-    with patch.object(SettingsManager, "_load", return_value=None):
+    with (
+        patch("aria.logger.info"),
+        patch("aria.logger.warning"),
+        patch.object(SettingsManager, "_load", return_value=None),
+    ):
         sm = SettingsManager.__new__(SettingsManager)
         sm._config_dir = tmp_path / ".config" / "aria"
         sm._config_file = sm._config_dir / "settings.json"
