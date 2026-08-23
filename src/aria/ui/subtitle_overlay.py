@@ -40,6 +40,7 @@ class SubtitleOverlay(QWidget):
 
         self._position_key = position_key
         self._on_close_callback = on_close
+        self._close_fired = False
 
         # Drag/Resize state
         self._drag_pos: QPoint | None = None
@@ -332,12 +333,21 @@ class SubtitleOverlay(QWidget):
     # === Window close ===
     def closeEvent(self, event):
         """Handle window close."""
+        if self._close_fired:
+            event.accept()
+            return
+        self._close_fired = True
         # Save position on close
         self._save_position()
 
         if self._on_close_callback:
             self._on_close_callback()
         event.accept()
+
+    def showEvent(self, event):
+        """Reset close guard when overlay becomes visible again."""
+        self._close_fired = False
+        super().showEvent(event)
 
     # === Public API ===
     def update_subtitle(

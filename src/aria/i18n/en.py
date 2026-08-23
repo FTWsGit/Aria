@@ -26,7 +26,7 @@ TRANSLATIONS = {
     "lang": "Language",
     "manage_models": "📦 Manage Models",
     # Start button
-    "start_button": "🚀 Start Subtitles",
+    "start_button": "Start Subtitles",
     "stop_button": "⏹ Stop Subtitles",
     "loading": "🔄 Loading...",
     # Status

@@ -26,7 +26,7 @@ TRANSLATIONS = {
     "lang": "语言",
     "manage_models": "📦 管理模型",
     # Start button
-    "start_button": "🚀 启动字幕",
+    "start_button": "启动字幕",
     "stop_button": "⏹ 停止字幕",
     "loading": "🔄 载入中...",
     # Status

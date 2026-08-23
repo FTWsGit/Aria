@@ -161,7 +161,18 @@ class ModelRow(QFrame):
         else:
             self.action_button.setText(t("download"))
             self.action_button.setEnabled(True)
-            self.action_button.setStyleSheet("")
+            self.action_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #3B8ED0;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #4AA3E0;
+                }
+            """)
             self.progress_bar.hide()
             self.status_text.hide()
             self.progress_note.hide()

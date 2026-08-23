@@ -270,7 +270,7 @@ class TranslationStateManager:
                     warning(f"TSM: Commit translation error: {e}")
 
             # Remove from draft
-            self._draft_sources = self._draft_sources[self.COMMIT_COUNT :]
+            self._draft_sources = self._draft_sources[commit_target:]
 
             # Re-translate remaining draft
             if self._draft_sources and self.translator:

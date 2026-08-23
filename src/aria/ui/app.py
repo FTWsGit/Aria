@@ -3,11 +3,12 @@ Main Application using PyQt6 - Coordinates settings window, overlay, and pipelin
 """
 
 import os
+import signal
 import sys
 import threading
 from pathlib import Path
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
@@ -88,6 +89,13 @@ class App:
         # Create and start system tray
         self._tray = SystemTray(on_show=self._on_tray_show, on_toggle=self._on_tray_toggle, on_quit=self._on_tray_quit)
         self._tray.start()
+
+        # Handle Ctrl+C gracefully
+        signal.signal(signal.SIGINT, lambda sig, frame: self._cleanup_and_quit())
+        # Qt event loop blocks Python signal delivery; a timer forces periodic checks
+        self._sigint_timer = QTimer()
+        self._sigint_timer.timeout.connect(lambda: None)
+        self._sigint_timer.start(500)
 
         # Start the Qt event loop
         sys.exit(self._app.exec())
@@ -291,10 +299,6 @@ class App:
             # Windows LiveCaptions shows the original text
             # We only need to handle translation
             if self._translation_overlay:
-                # 隱藏原文框（LiveCaptions 已顯示）
-                if hasattr(self._translation_overlay, "subtitle_label"):
-                    self._translation_overlay.subtitle_label.hide()
-
                 # 使用新的雙緩衝字段
                 if (
                     getattr(event, "committed_translation", None) is not None

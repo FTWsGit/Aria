@@ -317,7 +317,7 @@ class SettingsWindow(QMainWindow):
         button_row = QHBoxLayout()
         button_row.addStretch()
 
-        self.start_button = QPushButton("🎙 " + t("start"))
+        self.start_button = QPushButton("🎙 " + t("start_button"))
         self.start_button.setMinimumHeight(45)
         self.start_button.setMinimumWidth(150)
         self.start_button.setStyleSheet("""
@@ -877,6 +877,7 @@ class SettingsWindow(QMainWindow):
             self.mode_livecaptions_btn.setChecked(True)
             self.mode_desc.setText(t("mode_livecaptions_desc"))
             # Disable model selection (uses Windows LiveCaptions)
+            self.model_label.setText(t("model") + ":")
             self.model_label.hide()
             self.model_dropdown.hide()
             self.lang_label.hide()
@@ -1164,7 +1165,7 @@ class SettingsWindow(QMainWindow):
     def show_running(self):
         """Update UI to show running state."""
         self._is_running = True
-        self.start_button.setText("⏹ " + t("stop"))
+        self.start_button.setText("⏹ " + t("stop_button"))
         self.start_button.setStyleSheet("""
             QPushButton {
                 background-color: #E04040;
@@ -1185,7 +1186,7 @@ class SettingsWindow(QMainWindow):
     def show_stopped(self):
         """Update UI to show stopped state."""
         self._is_running = False
-        self.start_button.setText("🎙 " + t("start"))
+        self.start_button.setText("🎙 " + t("start_button"))
         self.start_button.setStyleSheet("")  # Reset to default
         self.status_label.setText(t("status_ready"))
         self.status_label.setStyleSheet("color: #888888;")
