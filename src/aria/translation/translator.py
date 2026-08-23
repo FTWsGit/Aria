@@ -202,6 +202,3 @@ def create_translator(engine: str = "bing", target_language: str = "zho_Hant", *
         )
     else:
         raise ValueError(f"Unknown translation engine: {engine}")
-
-
-

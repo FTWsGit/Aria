@@ -27,6 +27,7 @@ class SettingsManager:
         "openai_temperature": 0.2,
         "openai_max_tokens": 1024,
         "openai_system_prompt": "",
+        "ui_language": "zh_CN",
     }
 
     def __init__(self):

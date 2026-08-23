@@ -3,6 +3,8 @@ Windows LiveCaptions Monitor
 Captures real-time subtitle text using UI Automation
 """
 
+from __future__ import annotations
+
 import threading
 import time
 from collections.abc import Callable

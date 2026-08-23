@@ -51,11 +51,12 @@ class SherpaOnnxBackend:
 
         kwargs = {
             **resolved_files,
-            "num_threads": spec.params.get("num_threads", 4),
+            **spec.params,
             "sample_rate": self.SAMPLE_RATE,
-            "feature_dim": spec.params.get("feature_dim", 80),
-            "decoding_method": spec.params.get("decoding_method", "greedy_search"),
         }
+        kwargs.setdefault("num_threads", 4)
+        kwargs.setdefault("feature_dim", 80)
+        kwargs.setdefault("decoding_method", "greedy_search")
         self._recognizer = factory(**kwargs)
         self._stream = self._recognizer.create_stream()
 

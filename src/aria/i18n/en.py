@@ -140,4 +140,6 @@ TRANSLATIONS = {
     "streaming_models": "Streaming Models",
     "open_models_folder": "Open Models Folder",
     "close": "Close",
+    "configure": "Configure",
+    "back": "Back",
 }

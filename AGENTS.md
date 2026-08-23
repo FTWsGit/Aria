@@ -62,26 +62,7 @@ uv run python -c "import aria; print('import ok')"
 
 ## 架构规则
 
-1. 保持音频捕获、ASR、翻译、UI 的分离。
-2. 翻译独立于 ASR，一份转录可发送到多个翻译提供者。
-3. 优先使用回调/事件接口传递部分和最终转录结果。实时后端不应阻塞 UI 线程。
-4. 实时路径中避免无界队列。如果生产者快于推理，限制队列并优先丢弃过时音频。
-5. 尽可能在开始实时捕获前加载/预热模型，避免模型初始化导致音频积压。
-6. 使用现有 settings/logging 抽象，不要引入新的全局配置机制。
-
-## 流式 ASR 指南
-
-ARIA 有两条 ASR 路径：`asr_streaming`（Sherpa-ONNX OnlineRecognizer，真正的流式识别器，持续产生 partial result）和 `asr_chunked`（whisper-http，按时间窗口攒块发送 HTTP 请求）。模型配置由 `ModelRegistry` 扫描 `models/*.yaml` 驱动，权重文件放置在 `models_cache/` 下。不再使用自动 glob 发现模型文件。
-
-流式 ASR 开发注意事项：
-
-- 优先使用真正的流式架构（如 streaming Transducer/Zipformer），而非反复解码重叠的 Whisper 窗口。
-- 优先使用 ONNX Runtime 兼容模型，以便 Windows/AMD 友好部署。
-- 模型选择/配置与推理逻辑分离。
-- 不要仅因为模型叫"realtime"就假设它是流式的；验证其推理 API 和状态处理。
-- 保持 16 kHz 单声道 PCM，除非后端明确要求其他格式。
-- 测量端到端延迟，不仅是模型推理时间。包括捕获、解码、翻译和渲染。
-- 对于内建字幕，正确完成 finalization 和避免重复文本与原始 token 延迟同等重要。
+- 保持音频捕获、ASR、翻译、UI 的分离。
 
 ## UI 和 UX 规则
 
@@ -97,22 +78,3 @@ ARIA 有两条 ASR 路径：`asr_streaming`（Sherpa-ONNX OnlineRecognizer，真
 - 修改 `audio/` 时同时测试系统音频和麦克风路径。
 - 注意设备枚举、默认设备变更、采样率和停止/重启时的资源清理。
 - 不要假设需要或已获得管理员权限。
-
-## 实时/翻译正确性
-
-修改实时管道时，明确区分以下状态：
-
-- partial transcript：说话进行中显示的可变文本；
-- committed transcript：不应重复翻译的稳定文本；
-- translation draft：当前部分段落可替换的翻译；
-- translation commit：对应已提交源文本的稳定翻译。
-
-避免将每个 partial ASR 更新都发送到翻译 API。优先翻译已完成或故意去抖的段落，控制并发，防止翻译延迟无限增长。
-
-## 任务完成前
-
-1. 确认修改的模块仍能干净导入。
-2. 对修改的 Python 文件运行 Ruff。
-3. 在可行时运行完整测试套件。
-4. 对于实时变更，在可用的 Windows 音频源上执行手动冒烟测试。
-5. 明确报告已验证的内容、未验证的内容以及任何硬件/模型限制。

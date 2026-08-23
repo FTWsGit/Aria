@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QVBoxLayout,
@@ -220,6 +221,26 @@ class SettingsWindow(QMainWindow):
             QComboBox:hover {
                 border-color: #3B8ED0;
             }
+            QScrollBar:vertical {
+                background-color: transparent;
+                width: 8px;
+                margin: 0;
+                border: none;
+            }
+            QScrollBar::handle:vertical {
+                background-color: rgba(255, 255, 255, 0.12);
+                border-radius: 4px;
+                min-height: 30px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: rgba(255, 255, 255, 0.22);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
         """
 
     def _create_ui(self):
@@ -230,12 +251,40 @@ class SettingsWindow(QMainWindow):
 
         # Main layout
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        # === Header ===
+        # === Header (fixed, not scrollable) ===
         header = self._create_header()
+        header.setContentsMargins(20, 20, 20, 10)
         main_layout.addWidget(header)
+
+        # === Scrollable content area ===
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setStyleSheet("QScrollArea { background-color: transparent; border: none; }")
+
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("""
+            background-color: transparent;
+            QFrame#card {
+                background-color: #2a2a2a;
+                border-radius: 12px;
+            }
+            QPushButton#secondary {
+                background-color: transparent;
+                border: 1px solid #555555;
+                color: #aaaaaa;
+            }
+            QPushButton#secondary:hover {
+                background-color: #333333;
+            }
+        """)
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(20, 10, 20, 20)
+        scroll_layout.setSpacing(15)
 
         # === Two-column layout ===
         columns = QHBoxLayout()
@@ -247,9 +296,9 @@ class SettingsWindow(QMainWindow):
         self.recognition_card = self._create_recognition_card()
         self.model_card = self._create_model_card()
         left_col.addWidget(self.recognition_card, 0)
-        left_col.addWidget(self.model_card, 1)
+        left_col.addWidget(self.model_card, 0)
         left_col.setStretch(0, 0)
-        left_col.setStretch(1, 1)
+        left_col.setStretch(1, 0)
         columns.addLayout(left_col, 1)  # Equal weight
 
         # Right column
@@ -259,10 +308,10 @@ class SettingsWindow(QMainWindow):
         right_col.addWidget(self._create_reset_card())
         columns.addLayout(right_col, 1)  # Equal weight
 
-        main_layout.addLayout(columns)
+        scroll_layout.addLayout(columns)
 
         # Push button to bottom
-        main_layout.addStretch()
+        scroll_layout.addStretch()
 
         # === Start Button ===
         button_row = QHBoxLayout()
@@ -273,21 +322,38 @@ class SettingsWindow(QMainWindow):
         self.start_button.setMinimumWidth(150)
         self.start_button.setStyleSheet("""
             QPushButton {
+                background-color: #3B8ED0;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 20px;
                 font-size: 18px;
                 font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4AA3E0;
+            }
+            QPushButton:pressed {
+                background-color: #2A7DC0;
             }
         """)
         self.start_button.clicked.connect(self._on_start_click)
         button_row.addWidget(self.start_button)
 
         button_row.addStretch()
-        main_layout.addLayout(button_row)
+        scroll_layout.addLayout(button_row)
 
         # === Status Label (close to button) ===
         self.status_label = QLabel(t("status_ready"))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet("color: #888888; margin-top: 5px;")
-        main_layout.addWidget(self.status_label)
+        scroll_layout.addWidget(self.status_label)
+
+        self.scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(self.scroll_area)
+
+        # === OpenAI config overlay (hidden by default) ===
+        self._create_openai_overlay(central)
 
     def _create_header(self):
         """Create header with title and language selector."""
@@ -515,27 +581,51 @@ class SettingsWindow(QMainWindow):
         )
         self.trans_engine_dropdown.currentTextChanged.connect(self._on_engine_change)
         engine_row.addWidget(self.trans_engine_dropdown)
+
+        self.openai_config_btn = QPushButton(t("configure"))
+        self.openai_config_btn.setObjectName("secondary")
+        self.openai_config_btn.setMaximumWidth(100)
+        self.openai_config_btn.clicked.connect(self._show_openai_overlay)
+        self.openai_config_btn.hide()
+        engine_row.addWidget(self.openai_config_btn)
+
         engine_row.addStretch()
         layout.addLayout(engine_row)
 
-        # OpenAI parameter section (hidden by default, shown when OpenAI selected)
-        self.openai_section = QFrame()
-        self.openai_section.setStyleSheet("""
-            QFrame {
-                background-color: #333333;
-                border-radius: 6px;
-                padding: 10px;
+        # Target language dropdown
+        target_row = QHBoxLayout()
+        target_row.addWidget(QLabel(t("target_lang") + ":"))
+        self.target_lang_dropdown = QComboBox()
+        from ..translation.language_names import get_target_language_options
+
+        for display_name, _code in get_target_language_options():
+            self.target_lang_dropdown.addItem(display_name, _code)
+        self.target_lang_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
+        target_row.addWidget(self.target_lang_dropdown)
+        target_row.addStretch()
+        layout.addLayout(target_row)
+
+        return card
+
+    def _create_openai_overlay(self, parent: QWidget):
+        """Create the OpenAI config overlay panel. Covers the content area."""
+        self.openai_overlay = QFrame(parent)
+        self.openai_overlay.setObjectName("openai_overlay")
+        self.openai_overlay.setStyleSheet("""
+            QFrame#openai_overlay {
+                background-color: #1a1a1a;
+                border-radius: 12px;
             }
             QLabel {
-                color: #aaaaaa;
-                font-size: 12px;
+                color: #cccccc;
+                font-size: 13px;
             }
             QLineEdit, QDoubleSpinBox, QSpinBox {
                 background-color: #2a2a2a;
                 color: white;
                 border: 1px solid #444444;
                 border-radius: 4px;
-                padding: 4px 8px;
+                padding: 6px 10px;
             }
             QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
                 border-color: #3B8ED0;
@@ -581,9 +671,18 @@ class SettingsWindow(QMainWindow):
                 height: 0px;
             }
         """)
-        openai_layout = QVBoxLayout(self.openai_section)
-        openai_layout.setContentsMargins(10, 8, 10, 8)
-        openai_layout.setSpacing(6)
+        self.openai_overlay.hide()
+
+        overlay_layout = QVBoxLayout(self.openai_overlay)
+        overlay_layout.setContentsMargins(24, 18, 24, 18)
+        overlay_layout.setSpacing(10)
+
+        # Back button
+        back_btn = QPushButton("← " + t("back"))
+        back_btn.setObjectName("secondary")
+        back_btn.setMaximumWidth(100)
+        back_btn.clicked.connect(self._hide_openai_overlay)
+        overlay_layout.addWidget(back_btn)
 
         # Endpoint
         ep_row = QHBoxLayout()
@@ -591,7 +690,7 @@ class SettingsWindow(QMainWindow):
         self.openai_endpoint = QLineEdit("http://127.0.0.1:8080/v1")
         self.openai_endpoint.textChanged.connect(lambda _: self._persist_ui_settings())
         ep_row.addWidget(self.openai_endpoint)
-        openai_layout.addLayout(ep_row)
+        overlay_layout.addLayout(ep_row)
 
         # API Key
         key_row = QHBoxLayout()
@@ -601,7 +700,7 @@ class SettingsWindow(QMainWindow):
         self.openai_api_key.setPlaceholderText("optional")
         self.openai_api_key.textChanged.connect(lambda _: self._persist_ui_settings())
         key_row.addWidget(self.openai_api_key)
-        openai_layout.addLayout(key_row)
+        overlay_layout.addLayout(key_row)
 
         # Model Name
         model_row = QHBoxLayout()
@@ -610,7 +709,7 @@ class SettingsWindow(QMainWindow):
         self.openai_model_name.setPlaceholderText("default")
         self.openai_model_name.textChanged.connect(lambda _: self._persist_ui_settings())
         model_row.addWidget(self.openai_model_name)
-        openai_layout.addLayout(model_row)
+        overlay_layout.addLayout(model_row)
 
         # System Prompt
         sys_row = QHBoxLayout()
@@ -619,9 +718,9 @@ class SettingsWindow(QMainWindow):
         self.openai_system_prompt.setPlaceholderText("default")
         self.openai_system_prompt.textChanged.connect(lambda _: self._persist_ui_settings())
         sys_row.addWidget(self.openai_system_prompt)
-        openai_layout.addLayout(sys_row)
+        overlay_layout.addLayout(sys_row)
 
-        # Temperature + Max Tokens in one row
+        # Temperature + Max Tokens
         params_row = QHBoxLayout()
         params_row.addWidget(QLabel("Temp:"))
         self.openai_temperature = QDoubleSpinBox()
@@ -637,33 +736,34 @@ class SettingsWindow(QMainWindow):
         self.openai_max_tokens.setValue(4096)
         self.openai_max_tokens.valueChanged.connect(lambda _: self._persist_ui_settings())
         params_row.addWidget(self.openai_max_tokens)
-        openai_layout.addLayout(params_row)
+        overlay_layout.addLayout(params_row)
 
-        self.openai_section.hide()
-        layout.addWidget(self.openai_section)
+        overlay_layout.addStretch()
 
-        # Target language dropdown
-        target_row = QHBoxLayout()
-        target_row.addWidget(QLabel(t("target_lang") + ":"))
-        self.target_lang_dropdown = QComboBox()
-        self.target_lang_dropdown.addItems(
-            [
-                t("target_zh_TW"),
-                t("target_zh_CN"),
-                t("target_en"),
-                t("target_ja"),
-                t("target_ko"),
-                t("target_es"),
-                t("target_fr"),
-                t("target_de"),
-            ]
-        )
-        self.target_lang_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
-        target_row.addWidget(self.target_lang_dropdown)
-        target_row.addStretch()
-        layout.addLayout(target_row)
+    def _show_openai_overlay(self):
+        """Show the OpenAI config overlay, covering the scroll area."""
+        self.scroll_area.hide()
+        # Position overlay to cover the scroll area
+        self.openai_overlay.setGeometry(self.scroll_area.geometry())
+        self.openai_overlay.show()
+        self.openai_overlay.raise_()
 
-        return card
+    def _hide_openai_overlay(self):
+        """Hide the OpenAI config overlay."""
+        self.openai_overlay.hide()
+        self.scroll_area.show()
+
+    def resizeEvent(self, event):
+        """Reposition overlay when window resizes."""
+        super().resizeEvent(event)
+        if hasattr(self, "openai_overlay") and self.openai_overlay.isVisible():
+            self.openai_overlay.setGeometry(self.scroll_area.geometry())
+
+    def showEvent(self, event):
+        """Reposition overlay on first show."""
+        super().showEvent(event)
+        if hasattr(self, "openai_overlay") and self.openai_overlay.isVisible():
+            self.openai_overlay.setGeometry(self.scroll_area.geometry())
 
     def _create_reset_card(self):
         """Create reset settings card."""
@@ -802,11 +902,12 @@ class SettingsWindow(QMainWindow):
         self._persist_ui_settings()
 
     def _on_engine_change(self, _text: str):
-        """Handle translation engine change - show/hide OpenAI params."""
+        """Handle translation engine change - show/hide OpenAI configure button."""
         if _text == t("engine_openai"):
-            self.openai_section.show()
+            self.openai_config_btn.show()
         else:
-            self.openai_section.hide()
+            self.openai_config_btn.hide()
+            self._hide_openai_overlay()
         self._persist_ui_settings()
 
     def _on_audio_source_change(self, _value: str):
@@ -983,21 +1084,7 @@ class SettingsWindow(QMainWindow):
 
     def _get_target_language_code(self) -> str:
         """Get target language code from dropdown."""
-        target_display = self.target_lang_dropdown.currentText()
-
-        # Map display names to NLLB codes
-        target_map = {
-            t("target_zh_TW"): "zho_Hant",
-            t("target_zh_CN"): "zho_Hans",
-            t("target_en"): "eng_Latn",
-            t("target_ja"): "jpn_Jpan",
-            t("target_ko"): "kor_Hang",
-            t("target_es"): "spa_Latn",
-            t("target_fr"): "fra_Latn",
-            t("target_de"): "deu_Latn",
-        }
-
-        return target_map.get(target_display, "zho_Hant")
+        return self.target_lang_dropdown.currentData() or "zho_Hant"
 
     def _save_settings(self, settings: dict):
         """Save settings to file."""
@@ -1044,18 +1131,12 @@ class SettingsWindow(QMainWindow):
 
         # Target language
         target = sm.get("target_language", "zho_Hant")
-        target_map = {
-            "zho_Hant": t("target_zh_TW"),
-            "zho_Hans": t("target_zh_CN"),
-            "eng_Latn": t("target_en"),
-            "jpn_Jpan": t("target_ja"),
-            "kor_Hang": t("target_ko"),
-            "spa_Latn": t("target_es"),
-            "fra_Latn": t("target_fr"),
-            "deu_Latn": t("target_de"),
-        }
-        if target in target_map:
-            self.target_lang_dropdown.setCurrentText(target_map[target])
+        from ..translation.language_names import nllb_code_to_name
+
+        display_name = nllb_code_to_name(target)
+        idx = self.target_lang_dropdown.findText(display_name)
+        if idx >= 0:
+            self.target_lang_dropdown.setCurrentIndex(idx)
 
         tz_name = sm.get("timezone", "system") or "system"
         if not validate_timezone_name(tz_name):

@@ -189,6 +189,9 @@ class App:
             if self._translation_overlay:
                 self._translation_overlay.hide()
 
+        # Defensive: clean up any leftover pipeline from a previous error path
+        self._stop_pipeline()
+
         # Create pipeline
         def create_pipeline():
             try:
@@ -330,9 +333,16 @@ class App:
                 draft_translation=event.draft_translation,
             )
 
+    def _stop_pipeline(self) -> None:
+        """Stop and release the pipeline instance."""
+        if self._pipeline:
+            self._pipeline.stop()
+            self._pipeline = None
+
     def _on_error(self, error: str) -> None:
         """Handle pipeline error."""
         self._is_running = False
+        self._stop_pipeline()
         self._settings_window.show_stopped()
         display_msg = t(error)
         self._settings_window.status_label.setText(display_msg)
@@ -345,9 +355,7 @@ class App:
         """Stop the pipeline and overlay."""
         self._is_running = False
 
-        if self._pipeline:
-            self._pipeline.stop()
-            self._pipeline = None
+        self._stop_pipeline()
 
         if self._overlay:
             self._overlay.hide()

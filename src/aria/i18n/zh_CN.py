@@ -140,4 +140,6 @@ TRANSLATIONS = {
     "streaming_models": "流式识别模型",
     "open_models_folder": "打开模型文件夹",
     "close": "关闭",
+    "configure": "配置",
+    "back": "返回",
 }

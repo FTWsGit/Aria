@@ -1,6 +1,7 @@
 """OpenAI-compatible translator using the official openai package."""
 
 from ..logger import debug, info
+from .language_names import nllb_code_to_name
 
 
 class OpenAITranslator:
@@ -26,7 +27,8 @@ class OpenAITranslator:
             api_key=api_key or "dummy",
         )
         self.model_name = model_name
-        self.target_language = target_language
+        # Convert NLLB codes (e.g. "zho_Hans") to human-readable names
+        self.target_language = nllb_code_to_name(target_language)
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.system_prompt = system_prompt or (
@@ -36,7 +38,7 @@ class OpenAITranslator:
             "- 尽量使用短句，而不是复杂长句"
         )
         info(
-            f"OpenAITranslator initialized: endpoint={endpoint}, model={model_name or 'default'}, target={target_language}"
+            f"OpenAITranslator initialized: endpoint={endpoint}, model={model_name or 'default'}, target={self.target_language}"
         )
 
     def translate(self, text: str) -> str:
@@ -57,5 +59,5 @@ class OpenAITranslator:
         return response.choices[0].message.content.strip()
 
     def set_target_language(self, language: str) -> None:
-        self.target_language = language
-        debug(f"OpenAITranslator target language set to: {language}")
+        self.target_language = nllb_code_to_name(language)
+        debug(f"OpenAITranslator target language set to: {self.target_language}")

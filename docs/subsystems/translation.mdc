@@ -29,6 +29,13 @@ translator = create_translator(engine="bing", target_language="zho_Hant")
 result = translator.translate("hello")
 ```
 
+`target_language` 使用 NLLB 格式码（如 `"zho_Hans"`）。各引擎在构造时自行转换为本引擎需要的格式：
+
+- `TranslatorsLibWrapper`：`LANGUAGE_CODES` 字典按引擎转换 NLLB 码
+- `OpenAITranslator`：`nllb_code_to_name()` 转换为人类可读语言名（如 `"简体中文"`），用于拼 LLM prompt
+
+`translation/language_names.py` 提供 NLLB 码 ↔ 人类可读语言名的共享映射，`settings_window` 和 `OpenAITranslator` 共用同一份映射表，避免重复维护。
+
 ## TranslationStateManager
 
 位于 `livecaptions/manager.py`，被实时管道和 Live Captions 管道共享。

@@ -315,7 +315,7 @@ class ModelManager:
                 shutil.rmtree(model_path)
                 return True
             except Exception as e:
-                print(f"[ModelManager] Delete error: {e}")
+                from ..logger import error as log_error
+
+                log_error(f"Delete error: {e}")
         return False
-
-
