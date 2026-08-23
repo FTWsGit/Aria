@@ -1,0 +1,27 @@
+---
+name: "0003-pyqt6-frameless-overlay"
+kind: "decision"
+description: "为什么选择 PyQt6 实现 frameless 可拖拽悬浮窗"
+status: "accepted"
+supersedes: ""
+---
+
+# 0003. PyQt6 frameless 悬浮窗
+
+## 背景
+
+实时字幕需要一个始终置顶、可拖拽、可调整大小、不抢占焦点的显示窗口。Win32 API 直接调用可以实现但代码复杂；Qt 提供了跨平台的 frameless 窗口和事件系统。
+
+## 决策
+
+使用 PyQt6 的 `Qt.WindowType.FramelessWindowHint` + `Qt.WindowType.WindowStaysOnTopHint` 实现悬浮窗：
+
+- `SubtitleOverlay` 处理 `mousePressEvent`/`mouseMoveEvent`/`mouseReleaseEvent` 实现拖拽和 resize
+- `PipelineSignals`（QObject + pyqtSignal）桥接后台线程和 Qt 主线程，避免跨线程 UI 操作
+- 源字幕和翻译字幕分离为两个独立 `SubtitleOverlay` 实例，可独立开关
+
+## 后果
+
+- 优点：跨平台（理论上），信号槽机制天然解决线程安全
+- 代价：PyQt6 体积大，依赖较重；frameless 窗口需自行实现所有交互
+- 双色渲染：committed 文本深色、draft 文本绿色，通过 `SubtitleEvent` 中的标记区分

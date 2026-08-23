@@ -1,0 +1,29 @@
+---
+name: "0002-translation-independent-layer"
+kind: "decision"
+description: "为什么翻译是独立于 ASR 的层，不嵌入 ASR 后端"
+status: "accepted"
+supersedes: ""
+---
+
+# 0002. 翻译作为独立层
+
+## 背景
+
+ASR 和翻译是两个独立的变化轴：ASR 负责语音→文本，翻译负责源语言→目标语言。将翻译嵌入 ASR 后端会导致耦合——切换 ASR 时翻译行为不一致，切换翻译引擎时可能影响 ASR 性能。
+
+## 决策
+
+翻译作为独立层存在于 `translation/` 目录，通过 `TranslationStateManager` 桥接到两条 ASR 管道：
+
+- `pipeline.py`（实时管道）和 `livecaptions/pipeline.py`（Live Captions 管道）都 import `TranslationStateManager`
+- ASR 线程只更新 `_latest_raw_text`，翻译线程独立消费，通过 `_new_text_event` 和 `_text_lock` 同步
+- 一份转录可同时发送到多个翻译提供者
+- 翻译可单独开关，不影响 ASR
+
+## 后果
+
+- 优点：翻译引擎（Google/Bing/Youdao/OpenAI）可热切换，不影响音频捕获和 ASR
+- 代价：`TranslationStateManager` 文件位于 `livecaptions/manager.py`，但服务于双管道——这是位置异常的共享组件，文档需明确标注
+- 翻译在后台线程执行，网络阻塞不阻塞 ASR
+- Aria 不下载、不缓存、不管理任何翻译模型权重

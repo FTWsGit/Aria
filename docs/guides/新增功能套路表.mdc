@@ -1,0 +1,61 @@
+---
+name: "新增功能套路表"
+kind: "guide"
+description: "查表型文档：常见'加一个 XXX 功能'该抄哪个现成模式，一行任务对一行答案。新加一类功能前先来这查有没有现成模式可抄。"
+alwaysApply: false
+---
+
+# 新增功能时的套路
+
+## 常见套路查表
+
+| 要做什么 | 抄哪个模式 |
+|---|---|
+| 加一个新的 i18n key | `i18n/zh_CN.py` + `i18n/en.py` 同步添加，`t("key_name")` 调用 |
+| 加一个新的 ASR backend | 实现 `StreamingASR` 或 `ChunkedASR` Protocol，在 `pipeline.py` 的 `ASR_BACKENDS` 注册 |
+| 加一个新的翻译引擎 | 在 `translation/` 目录添加 translator 类，`create_translator()` 工厂函数新增 engine 分支 |
+| 加一个新的模型 | 在 `models/` 目录加 yaml 文件，`ModelRegistry` 自动扫描；无需改代码 |
+| 加一个新的设置项 | `settings_manager.py` 的 `DEFAULT_SETTINGS` 加默认值 + `settings_window.py` 添加 UI 控件 |
+| 加一个新的事件类型 | `events.py` 定义 dataclass，`PipelineSignals` 添加对应 `pyqtSignal` |
+| 加一个新的悬浮窗 | 继承 `SubtitleOverlay` 或复用 `SubtitleOverlay` 实例，源字幕和翻译字幕分离 |
+| 加一个新的 UI 页面 | 在 `ui/` 目录加 QWidget 子类，`App._on_start()` 中根据 settings 决定是否创建 |
+| 加一个新的托盘菜单项 | `system_tray.py` 添加菜单项，连接对应槽函数 |
+| 加一个新的 ModelManager 下载源 | `model_manager/manager.py` 按 `source.type` 分发，新增 `url_zip`/`url_tar` 等类型的处理逻辑 |
+| 加一个新的 Settings 卡片 | `settings_window.py` 的 `_create_xxx_card()` 模式，`_gather_settings()` 收集字段 |
+| 加一个新的 OpenAI 覆盖面板字段 | `settings_window.py` 的 `_create_openai_overlay()` 模式，`_show_openai_overlay()` 控制显隐 |
+
+## 跨线程通信
+
+后台线程（ASR/翻译/音频捕获）与 UI 通信一律走 `PipelineSignals`：
+
+```python
+# 定义信号
+class PipelineSignals(QObject):
+    subtitle = pyqtSignal(SubtitleEvent)
+    started = pyqtSignal()
+    error = pyqtSignal(str)
+
+# 后台线程 emit
+self._signals.subtitle.emit(event)
+
+# UI 主线程连接
+signals.subtitle.connect(self._on_subtitle)
+```
+
+**禁止**后台线程直接操作 Qt 控件。
+
+## 新增 ASR backend 的完整流程
+
+以新增一个 HTTP 流式识别后端为例：
+
+1. `transcription/` 下新建 `my_backend.py`，实现 `StreamingASR` Protocol（`process_audio`/`reset`/`get_final_result`）
+2. `pipeline.py` 的 `ASR_BACKENDS` 字典注册 `{"my_backend": MyBackend}`
+3. `models/*.yaml` 中 `backend: my_backend` + `kind: asr_streaming`
+4. 无需修改 `AudioCapture`、`TranslationStateManager`、`SubtitleOverlay`——它们不感知 ASR 来源
+
+## 新增翻译引擎的完整流程
+
+1. `translation/` 下新建 `my_translator.py`，实现 `translate(text: str) -> str` 方法
+2. `translation/translator.py` 的 `create_translator()` 新增 `engine="my_engine"` 分支
+3. `settings_window.py` 的翻译引擎下拉列表自动显示新引擎（走 `create_translator` 工厂枚举）
+4. 无需修改 `TranslationStateManager`——它只认 translator 实例，不感知引擎类型

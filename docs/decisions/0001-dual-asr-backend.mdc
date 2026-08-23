@@ -1,0 +1,29 @@
+---
+name: "0001-dual-asr-backend"
+kind: "decision"
+description: "为什么同时支持 Sherpa-ONNX 流式识别和 Whisper HTTP 分段识别两条 ASR 路径"
+status: "accepted"
+supersedes: ""
+---
+
+# 0001. 双后端 ASR 架构
+
+## 背景
+
+ASR 是实时字幕的核心组件，单一后端无法覆盖所有使用场景。Sherpa-ONNX 提供本地流式识别（低延迟、无需网络），但需要下载模型权重；Whisper HTTP 提供远程分段识别（无需本地 GPU/模型，但依赖网络）。两种路径在延迟、隐私、硬件要求上互补。
+
+## 决策
+
+两条 ASR 路径通过 `StreamingPipeline` 的 `mode` 参数切换，共享相同的音频捕获和翻译层：
+
+- **streaming**（`asr_streaming`）：`SherpaOnnxBackend`，音频直通 `process_audio()`，持续返回 partial result
+- **chunked**（`asr_chunked`）：`WhisperHttpBackend`，按 `chunk_seconds` 攒块后发送 HTTP 请求，返回完整文本
+
+两者通过 `StreamingASR` / `ChunkedASR` Protocol 提供统一接口，`pipeline.py` 按 `spec.kind` 分发到 `ASR_BACKENDS`。
+
+## 后果
+
+- 优点：用户可按场景选择——离线用 Sherpa，需要多语言/高精度时用远程 Whisper
+- 代价：`pipeline.py` 需维护两套处理逻辑（逐帧 vs 攒块），测试矩阵翻倍
+- 共享翻译层：两条路径输出文本后走同一 `TranslationStateManager`，翻译不感知 ASR 来源
+- 模型配置通过 `models/*.yaml` 驱动，新增架构只需加 yaml + 实现对应 backend 类

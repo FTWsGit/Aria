@@ -1,0 +1,29 @@
+---
+name: "0004-wasapi-loopback-capture"
+kind: "decision"
+description: "为什么使用 WASAPI loopback 捕获系统音频，以及 pyaudiowpatch 的作用"
+status: "accepted"
+supersedes: ""
+---
+
+# 0004. WASAPI loopback 系统音频捕获
+
+## 背景
+
+实时字幕需要捕获系统正在播放的声音（比如视频、会议、游戏），而非仅麦克风输入。WASAPI loopback 是 Windows 上捕获系统音频的标准机制，但标准 PyAudio 不支持 loopback 设备。
+
+## 决策
+
+使用 `pyaudiowpatch`（PyAudio 的 fork，支持 WASAPI loopback）作为音频捕获后端：
+
+- `AudioCapture(source="system")` 通过 `_get_loopback_device()` 查找 loopback 设备
+- `source="mic:default"` / `source="mic:<index>"` 走标准麦克风路径
+- 输出统一为 float32、16 kHz 单声道、100ms chunks
+- 重采样由 `AudioCapture._resample()` 内部处理，下游无需关心设备原始采样率
+
+## 后果
+
+- 优点：用户可以选择捕获系统音频或麦克风，覆盖更多场景
+- 代价：`pyaudiowpatch` 是额外依赖；loopback 设备枚举和默认设备变更需注意资源清理
+- 停止时 `terminate()` PyAudio 实例，释放 WASAPI 资源
+- 不依赖 VAD——音频直通 ASR，分段/攒块由下游决定

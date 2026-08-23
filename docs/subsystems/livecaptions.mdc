@@ -18,7 +18,7 @@ alwaysApply: false
 | `pipeline.py` | `LiveCaptionsPipeline`：启动、监控、去重、翻译 |
 | `monitor.py` | `LiveCaptionsMonitor`：轮询 Windows LiveCaptions 窗口文本 |
 | `controller.py` | `LiveCaptionsController`：启动（Win+Ctrl+L）、最小化、隐藏、检测 |
-| `manager.py` | `TranslationStateManager`：翻译状态机（与实时管道共享） |
+| `manager.py` | `TranslationStateManager`：翻译状态机。**位置异常的共享组件**——文件在 `livecaptions/` 下，但实时管道（`pipeline.py`）也 import 它，不属于 Live Captions 独有 |
 
 ## 依赖
 

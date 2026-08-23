@@ -11,7 +11,7 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 
 ## 识别路径
 
-两条路径：
+三条路径：
 - **Sherpa-ONNX 流式识别**（`asr_streaming`）：音频直通 Sherpa OnlineRecognizer，无 VAD，无分段
 - **Whisper HTTP 分段识别**（`asr_chunked`）：攒块发送到兼容 OpenAI `/v1/audio/transcriptions` 的服务（whisper-server 等）
 - **Windows 11 内建字幕**（Live Captions 模式）

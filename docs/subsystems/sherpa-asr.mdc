@@ -40,8 +40,3 @@ result = recognizer.get_result(stream)
 - 不再硬编码 `from_transducer`——`recognizer_factory` 从 yaml 配置读取
 - 不硬编码模型 URL——模型路径由 `ModelManager.get_model_path()` 解析
 - `SHERPA_AVAILABLE` 在模块加载时设置，导入失败时为 False
-
-## 历史
-
-- 曾同时支持 Vosk 和 Sherpa，Vosk 已在统一重构中移除
-- 曾硬编码 `from_transducer` 和中文/英文模型 URL，已改为配置驱动

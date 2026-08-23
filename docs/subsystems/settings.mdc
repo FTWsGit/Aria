@@ -15,6 +15,8 @@ JSON 持久化用户设置，全局单例。
 
 `~/.config/aria/settings.json`
 
+Windows 实际路径：`C:\Users\<用户名>\.config\aria\settings.json`（代码使用 `Path.home() / ".config" / "aria"`，非 Windows 标准 `%APPDATA%` 路径）
+
 ## 默认设置
 
 ```python

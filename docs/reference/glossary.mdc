@@ -1,0 +1,34 @@
+---
+name: "glossary"
+kind: "reference"
+description: "查全库术语。涉及时查阅，避免一词多义。"
+alwaysApply: false
+---
+
+# 术语表
+
+| 术语 | 一句话定义 |
+|---|---|
+| **ASR** | Automatic Speech Recognition，语音识别，将音频转为文本 |
+| **WASAPI** | Windows Audio Session API，Windows 上音频捕获/播放的核心 API |
+| **WASAPI loopback** | 捕获系统正在播放的声音（非麦克风），需 `pyaudiowpatch` 支持 |
+| **VAD** | Voice Activity Detection，检测音频中是否有人声；本项目不使用 VAD |
+| **Sherpa-ONNX** | 开源流式 ASR 引擎，支持 transducer/paraformer/whisper 等多种架构 |
+| **OnlineRecognizer** | Sherpa-ONNX 的流式识别器类，逐帧解码 |
+| **StreamingASR** | 流式 ASR 后端 Protocol，`process_audio()` 返回累计文本 |
+| **ChunkedASR** | 分段 ASR 后端 Protocol，`transcribe(audio, sr)` 返回完整文本 |
+| **Live Captions** | Windows 11 内建字幕功能（Win+Ctrl+L），通过 UI Automation 读取文本 |
+| **UI Automation** | Windows 无障碍 API，用于读取其他窗口的文本内容 |
+| **NLLB** | Meta 的多语言翻译模型，本项目用其语言码格式（如 `zho_Hans`）标识目标语言 |
+| **TranslationStateManager** | 翻译状态机，滑动窗口 + 模糊匹配区分 committed/draft 翻译 |
+| **SubtitleEvent** | 管道到 UI 的事件对象，携带 raw_text/committed_translation/draft_translation |
+| **ModelSpec** | 模型规格，从 `models/*.yaml` 解析，包含 id/kind/backend/params 等 |
+| **ModelRegistry** | 扫描 `models/*.yaml` 构建模型索引，不触发下载 |
+| **ModelManager** | 管理模型下载、状态查询、本地路径 |
+| **PyQt6** | Qt 的 Python 绑定，本项目用于 UI 和悬浮窗 |
+| **pyqtSignal** | Qt 信号机制，本项目用于跨线程（ASR/翻译→UI）通信 |
+| **frameless window** | 无边框窗口，本项目字幕窗口可拖拽、可调整大小、始终置顶 |
+| **i18n** | 国际化，本项目支持 `zh_CN` 和 `en` 两种语言，`t()` 函数翻译 |
+| **PCM** | 脉冲编码调制，原始音频格式；本项目统一 float32 16kHz mono |
+| **partial result** | ASR 流式识别的中间结果，持续更新，不等句子结束 |
+| **committed/draft** | 翻译的两个状态：committed 已稳定、draft 仍在识别中 |
