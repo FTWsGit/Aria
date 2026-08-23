@@ -17,7 +17,7 @@ Aria 不管理任何翻译模型权重。LLM 由用户自行在外部起 server 
 
 | 引擎 | 实现 | 特点 |
 |---|---|---|
-| Google | `GoogleTranslator` (googletrans) | 在线免费 |
+| Google | `TranslatorsLibWrapper` | 在线免费，网页抓取，可能不稳定 |
 | Bing | `TranslatorsLibWrapper` | 在线 |
 | Youdao | `TranslatorsLibWrapper` | 仅中英互译 |
 | OpenAI-compatible | `OpenAITranslator` (openai) | 支持本地 llama-server、vLLM、ollama、DeepSeek、OpenAI 等 |

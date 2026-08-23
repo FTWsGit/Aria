@@ -24,6 +24,10 @@ text = t("key_name")
 set_language("en")
 ```
 
+`set_language()` 会将选择持久化到 `SettingsManager` 的 `ui_language` 配置项。
+
+`get_language_options()` 返回 `[(display_name, code), ...]` 列表，供 UI 下拉框使用。
+
 ## 翻译文件
 
 - `i18n/zh_CN.py`：`TRANSLATIONS` 字典

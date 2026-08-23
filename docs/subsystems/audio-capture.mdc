@@ -19,9 +19,15 @@ capture.start(callback=lambda audio, sr: ...)
 capture.stop()
 ```
 
-- `source="system"`：WASAPI loopback（系统播放的声音）
-- `source="mic:default"`：默认麦克风
-- `source="mic:<index>"`：指定麦克风设备索引
+## 音频源
+
+| source | 含义 |
+|---|---|
+| `"system"` | WASAPI loopback（系统播放的声音） |
+| `"mic:default"` | 默认麦克风 |
+| `"mic:<index>"` | 指定麦克风设备索引 |
+
+`list_microphone_devices()` 类方法返回可用麦克风设备列表（含 index、name、is_default）。
 
 ## 输出格式
 
@@ -40,3 +46,4 @@ capture.stop()
 - 设备枚举和默认设备变更需注意资源清理
 - 停止时 `terminate()` PyAudio 实例
 - 不依赖 VAD——音频直接输出给下游
+- `ts_tail` source 已移除，构造时自动 fallback 到 `"system"`

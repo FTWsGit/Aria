@@ -20,6 +20,8 @@ def test_default_settings():
         assert sm.get("mode") == "asr"
         assert sm.get("openai_max_tokens") == 1024
         assert sm.get("overlay_visible") is True
+        assert sm.get("openai_system_prompt") == ""
+        assert sm.get("ui_language") == "zh_CN"
 
 
 def test_settings_merge_defaults(tmp_path):
