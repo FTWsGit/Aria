@@ -21,7 +21,7 @@ Windows 实际路径：`C:\Users\<用户名>\.config\aria\settings.json`（代�
 
 ```python
 DEFAULT_SETTINGS = {
-    "mode": "realtime",
+    "mode": "asr",
     "min_duration": 100,
     "enable_translation": True,
     "translation_engine": "bing",

@@ -152,7 +152,7 @@ class App:
         start_simple_log_session()
 
         # Check mode
-        mode = settings.get("mode", "realtime")
+        mode = settings.get("mode", "asr")
         self._is_livecaptions_mode = mode == "livecaptions"
         self._enable_translation = settings.get("enable_translation", False)
 
@@ -185,7 +185,7 @@ class App:
                 self._translation_overlay.close()
                 self._translation_overlay = None
 
-            # Set overlay mode (realtime)
+            # Set overlay mode (asr)
             self._overlay.set_multiline_mode(True)
             if self._translation_overlay:
                 self._translation_overlay.set_multiline_mode(True)
@@ -374,11 +374,11 @@ class App:
 
     def _check_all_required_models(self, settings: dict) -> bool:
         """Check if all required models are available and prompt to download if not."""
-        mode = settings.get("mode", "realtime")
+        mode = settings.get("mode", "asr")
         if mode == "livecaptions":
             return True
 
-        model_id = settings.get("model_id") or "sherpa-zh-en-zipformer"
+        model_id = settings.get("model_id") or "None"
         try:
             spec = self._registry.get(model_id)
         except KeyError:

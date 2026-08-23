@@ -13,7 +13,7 @@ def test_default_settings():
         sm._config_file = sm._config_dir / "settings.json"
         sm._settings = sm.DEFAULT_SETTINGS.copy()
 
-        assert sm.get("mode") == "realtime"
+        assert sm.get("mode") == "asr"
         assert sm.get("openai_max_tokens") == 1024
         assert sm.get("overlay_visible") is True
 

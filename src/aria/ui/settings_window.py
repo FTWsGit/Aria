@@ -47,8 +47,8 @@ class SettingsWindow(QMainWindow):
     status_update = pyqtSignal(str, str)  # text, color
 
     @staticmethod
-    def _get_realtime_languages():
-        """Get available languages for realtime mode."""
+    def _get_asr_languages():
+        """Get available languages for asr mode."""
         return [
             ("中/英文", "zh"),  # Uses Sherpa
             ("日文", "ja"),  # Uses Vosk
@@ -81,8 +81,8 @@ class SettingsWindow(QMainWindow):
         ]
 
     @property
-    def REALTIME_LANGUAGES(self):
-        return self._get_realtime_languages()
+    def asr_LANGUAGES(self):
+        return self._get_asr_languages()
 
     @property
     def LANGUAGES(self):
@@ -377,7 +377,7 @@ class SettingsWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_container.addWidget(title)
 
-        subtitle = QLabel(t("subtitle") + " | v2.0.1")
+        subtitle = QLabel(t("subtitle"))
         subtitle.setStyleSheet("color: #aaaaaa; font-size: 12px;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_container.addWidget(subtitle)
@@ -422,18 +422,18 @@ class SettingsWindow(QMainWindow):
         card.setMinimumHeight(250)
         card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
-        # Mode selector (Precise / Realtime)
+        # Mode selector (Precise / asr)
         mode_layout = QHBoxLayout()
         mode_layout.setSpacing(10)
         mode_layout.setContentsMargins(0, 0, 0, 0)
         mode_layout.addStretch()
 
-        self.mode_realtime_btn = QPushButton(t("mode_realtime"))
-        self.mode_realtime_btn.setMinimumWidth(92)
-        self.mode_realtime_btn.setMinimumHeight(38)
-        self.mode_realtime_btn.setCheckable(True)
-        self.mode_realtime_btn.setChecked(True)
-        self.mode_realtime_btn.setStyleSheet("""
+        self.mode_asr_btn = QPushButton(t("mode_asr"))
+        self.mode_asr_btn.setMinimumWidth(92)
+        self.mode_asr_btn.setMinimumHeight(38)
+        self.mode_asr_btn.setCheckable(True)
+        self.mode_asr_btn.setChecked(True)
+        self.mode_asr_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 border: 1px solid #555555;
@@ -452,8 +452,8 @@ class SettingsWindow(QMainWindow):
                 background-color: #4AA3E0;
             }
         """)
-        self.mode_realtime_btn.clicked.connect(lambda: self._on_mode_change("realtime"))
-        mode_layout.addWidget(self.mode_realtime_btn)
+        self.mode_asr_btn.clicked.connect(lambda: self._on_mode_change("asr"))
+        mode_layout.addWidget(self.mode_asr_btn)
 
         self.mode_livecaptions_btn = QPushButton(t("mode_livecaptions"))
         self.mode_livecaptions_btn.setMinimumWidth(92)
@@ -485,7 +485,7 @@ class SettingsWindow(QMainWindow):
         layout.addLayout(mode_layout)
 
         # Mode description
-        self.mode_desc = QLabel(t("mode_realtime_desc"))
+        self.mode_desc = QLabel(t("mode_asr_desc"))
         self.mode_desc.setStyleSheet("color: #aaaaaa; font-size: 12px;")
         self.mode_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.mode_desc)
@@ -853,18 +853,18 @@ class SettingsWindow(QMainWindow):
 
     def _on_mode_change(self, mode: str):
         """Handle mode button click."""
-        if mode == "realtime":
-            self.mode_realtime_btn.setChecked(True)
+        if mode == "asr":
+            self.mode_asr_btn.setChecked(True)
             self.mode_livecaptions_btn.setChecked(False)
-            self.mode_desc.setText(t("mode_realtime_desc"))
-            # Swap to realtime language selection (shows in model dropdown position)
-            self.model_label.setText(t("lang") + ":")  # Change label to "语言:"
+            self.mode_desc.setText(t("mode_asr_desc"))
+            # Swap to asr language selection (shows in model dropdown position)
+            self.model_label.setText(t("model") + ":")  # Change label to "语言:"
             self.model_label.show()  # Ensure label is visible
             self.model_dropdown.clear()
             self._populate_model_dropdown()
             self.model_dropdown.setEnabled(True)
             self.model_dropdown.show()  # Ensure dropdown is visible
-            # Hide language dropdown in realtime mode (selection is in model dropdown)
+            # Hide language dropdown in asr mode (selection is in model dropdown)
             self.lang_label.hide()
             self.lang_dropdown.hide()
             self.manage_models_btn.show()
@@ -873,7 +873,7 @@ class SettingsWindow(QMainWindow):
             self.model_card.setEnabled(True)
             self.model_card.setStyleSheet("")
         else:  # livecaptions mode
-            self.mode_realtime_btn.setChecked(False)
+            self.mode_asr_btn.setChecked(False)
             self.mode_livecaptions_btn.setChecked(True)
             self.mode_desc.setText(t("mode_livecaptions_desc"))
             # Disable model selection (uses Windows LiveCaptions)
@@ -1024,14 +1024,14 @@ class SettingsWindow(QMainWindow):
     def _gather_settings(self) -> dict:
         """Gather current settings into a dictionary."""
         # Determine mode
-        mode = "livecaptions" if self.mode_livecaptions_btn.isChecked() else "realtime"
+        mode = "livecaptions" if self.mode_livecaptions_btn.isChecked() else "asr"
 
         if mode == "livecaptions":
             # LiveCaptions mode: no model/language selection needed
             model_id = None
             lang_code = None
         else:
-            # Realtime mode: model dropdown shows model specs from registry
+            # asr mode: model dropdown shows model specs from registry
             lang_code = None
             idx = self.model_dropdown.currentIndex()
             if idx >= 0:
@@ -1099,9 +1099,9 @@ class SettingsWindow(QMainWindow):
         sm = get_settings_manager()
 
         # Mode (handle legacy Chinese values and removed "precise" mode)
-        mode = sm.get("mode", "realtime")
-        if mode in ["實時", "realtime", "精準", "precise"]:
-            mode = "realtime"
+        mode = sm.get("mode", "asr")
+        if mode in ["實時", "asr", "精準", "precise"]:
+            mode = "asr"
         self._on_mode_change(mode)
 
         # Load model selection from saved model_id

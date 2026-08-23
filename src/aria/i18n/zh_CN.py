@@ -10,9 +10,9 @@ TRANSLATIONS = {
     "lang_en": "English",
     # Recognition settings
     "recognition_settings": "识别设置",
-    "mode_realtime": "即时",
-    "mode_livecaptions": "内建字幕",
-    "mode_realtime_desc": "纯流式 Sherpa-ONNX 语音识别",
+    "mode_asr": "ASR 字幕",
+    "mode_livecaptions": "Windows 内建字幕",
+    "mode_asr_desc": "流式语音识别",
     "mode_livecaptions_desc": "使用 Windows 11 内建实时字幕，需 22H2+ 版本",
     # Translation settings
     "translation_settings": "翻译设置",
@@ -40,7 +40,6 @@ TRANSLATIONS = {
     "model_path": "存放位置",
     "open_folder": "📂 打开",
     "recognition_models": "🎙️ 语音识别模型",
-    "realtime_models": "⚡ 实时识别模型",
     "translation_models": "🌐 翻译模型",
     "download": "下载",
     "delete": "删除",
@@ -80,11 +79,9 @@ TRANSLATIONS = {
     "target_de": "Deutsch",
     # Translation engines
     "engine_google_free": "Google",
-    "engine_baidu": "百度翻译",
     "engine_youdao": "有道翻译 (仅中英)",
     "engine_openai": "OpenAI 兼容",
     "engine_bing": "Bing",
-    "engine_alibaba": "阿里翻译",
     "translation_disclaimer": "",
     # Misc
     "yes": "是",
@@ -98,10 +95,6 @@ TRANSLATIONS = {
     # Tray notifications
     "tray_minimized_title": "程序已最小化到系统托盘",
     "tray_minimized_msg": "右键点击托盘图标可以控制字幕或退出程序",
-    # Model manager - model names
-    "model_name_sherpa_zh_en": "Sherpa-ONNX",
-    # Model manager - descriptions
-    "model_desc_sherpa_zh_en": "流式语音识别",
     # Download status messages
     "download_status_downloading": "正在下载 {name}...",
     "download_status_verifying": "验证中...",

@@ -12,7 +12,7 @@ class SettingsManager:
     """Manages saving and loading user settings."""
 
     DEFAULT_SETTINGS = {
-        "mode": "realtime",
+        "mode": "asr",
         "min_duration": 100,
         "enable_translation": True,
         "translation_engine": "bing",

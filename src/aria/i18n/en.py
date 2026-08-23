@@ -10,9 +10,9 @@ TRANSLATIONS = {
     "lang_en": "English",
     # Recognition settings
     "recognition_settings": "Recognition",
-    "mode_realtime": "Real-time",
-    "mode_livecaptions": "Live Captions",
-    "mode_realtime_desc": "Pure streaming ASR via Sherpa-ONNX",
+    "mode_asr": "ASR Transcribe",
+    "mode_livecaptions": "Windows Live Captions",
+    "mode_asr_desc": "Streaming Transcribe via ASR Model",
     "mode_livecaptions_desc": "Use Windows 11 built-in Live Captions, requires 22H2+",
     # Translation settings
     "translation_settings": "Translation",
@@ -40,7 +40,6 @@ TRANSLATIONS = {
     "model_path": "Location",
     "open_folder": "📂 Open",
     "recognition_models": "🎙️ Speech Recognition Models",
-    "realtime_models": "⚡ Realtime Recognition Models",
     "translation_models": "🌐 Translation Models",
     "download": "Download",
     "delete": "Delete",
@@ -80,11 +79,9 @@ TRANSLATIONS = {
     "target_de": "German",
     # Translation engines
     "engine_google_free": "Google",
-    "engine_baidu": "Baidu Translate",
     "engine_youdao": "Youdao (CN↔EN only)",
     "engine_openai": "OpenAI-compatible",
     "engine_bing": "Bing",
-    "engine_alibaba": "Alibaba Translate",
     "translation_disclaimer": "",
     # Misc
     "yes": "Yes",
@@ -98,10 +95,6 @@ TRANSLATIONS = {
     # Tray notifications
     "tray_minimized_title": "Minimized to system tray",
     "tray_minimized_msg": "Right-click the tray icon to control subtitles or quit",
-    # Model manager - model names
-    "model_name_sherpa_zh_en": "Sherpa-ONNX",
-    # Model manager - descriptions
-    "model_desc_sherpa_zh_en": "Streaming speech recognition",
     # Download status messages
     "download_status_downloading": "Downloading {name}...",
     "download_status_verifying": "Verifying...",
