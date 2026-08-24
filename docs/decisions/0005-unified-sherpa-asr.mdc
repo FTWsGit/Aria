@@ -1,0 +1,31 @@
+---
+name: "0005-unified-sherpa-asr"
+kind: "decision"
+description: "为什么用统一的 Sherpa-ONNX 同时驱动流式和分段识别，替代 Whisper HTTP 后端"
+status: "accepted"
+supersedes: "0001-dual-asr-backend"
+alwaysApply: false
+---
+
+# 0005. 统一 Sherpa-ONNX ASR 后端
+
+## 背景
+
+decision 0001 建立了双后端架构：Sherpa-ONNX 负责流式识别，Whisper HTTP 负责分段识别。随着 sherpa-onnx 生态成熟，`OfflineRecognizer` 已经能胜任分段识别场景，且 `models/asr_chunked/` 下的模型配置早已改为 `backend: sherpa_onnx`。维护 Whisper HTTP 后端（网络依赖、HTTP 超时、WAV 编码）的代价高于收益。
+
+## 决策
+
+删除 `WhisperHttpBackend`，全部 ASR 由 Sherpa-ONNX 驱动：
+
+- **流式**（`asr_streaming`）：`SherpaOnnxStreamingBackend` 使用 `OnlineRecognizer`
+- **分段**（`asr_chunked`）：`SherpaOnnxChunkedBackend` 使用 `OfflineRecognizer`
+
+两者共享 `_build_sherpa_kwargs()` 工厂函数，通过 `recognizer_factory` 字段从 YAML 配置动态选择架构。
+
+`pipeline.py` 按 kind 分派到 `STREAMING_BACKENDS` / `CHUNKED_BACKENDS` 两个字典，为未来 `transcribe.cpp` 等新后端预留了接入点。
+
+## 后果
+
+- 优点：零网络依赖，统一模型格式，减少维护面
+- 代价：分段识别不再支持远程 GPU 推理（如需远程推理，未来可新增 `transcribe_cpp` 等后端）
+- 后端注册表从单一 `ASR_BACKENDS` 字典拆为 `STREAMING_BACKENDS` + `CHUNKED_BACKENDS`，新增后端只需实现对应 Protocol 并注册到对应字典

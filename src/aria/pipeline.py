@@ -2,7 +2,7 @@
 Streaming Pipeline for real-time transcription.
 
 Config-driven pipeline that supports multiple ASR backends via ModelRegistry.
-Supports streaming (Sherpa-ONNX) and chunked (whisper-http) modes.
+Supports streaming (OnlineRecognizer) and chunked (OfflineRecognizer) modes.
 """
 
 import queue
@@ -20,8 +20,7 @@ from .logger import debug, exception, info, transcript, warning
 from .model_manager.manager import ModelManager
 from .model_manager.registry import ModelRegistry
 from .transcription.base import ChunkedASR, StreamingASR
-from .transcription.sherpa_onnx import SherpaOnnxBackend
-from .transcription.whisper_http import WhisperHttpBackend
+from .transcription.sherpa_onnx import SherpaOnnxStreamingBackend, SherpaOnnxChunkedBackend
 
 # Translation support (optional)
 try:
@@ -37,9 +36,12 @@ except ImportError as e:
 # TranslationStateManager for incremental translation
 from .livecaptions.manager import TranslationStateManager
 
-ASR_BACKENDS = {
-    "sherpa_onnx": SherpaOnnxBackend,
-    "whisper_http": WhisperHttpBackend,
+STREAMING_BACKENDS = {
+    "sherpa_onnx": SherpaOnnxStreamingBackend,
+}
+
+CHUNKED_BACKENDS = {
+    "sherpa_onnx": SherpaOnnxChunkedBackend,
 }
 
 
@@ -107,11 +109,11 @@ class StreamingPipeline:
 
         # Dispatch by kind
         if spec.kind == "asr_streaming":
-            backend_cls = ASR_BACKENDS[spec.backend]
+            backend_cls = STREAMING_BACKENDS[spec.backend]
             self._transcriber: StreamingASR = backend_cls(spec, model_root)
             self._mode = "streaming"
         elif spec.kind == "asr_chunked":
-            backend_cls = ASR_BACKENDS[spec.backend]
+            backend_cls = CHUNKED_BACKENDS[spec.backend]
             self._transcriber: ChunkedASR = backend_cls(spec, model_root)
             self._mode = "chunked"
         else:

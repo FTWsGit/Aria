@@ -70,7 +70,7 @@ def test_registry_list_filter_by_kind(tmp_path):
     yaml_content = {
         "id": "chunked-1",
         "kind": "asr_chunked",
-        "backend": "whisper_http",
+        "backend": "sherpa_onnx",
         "display_name": "C1",
         "language": "en",
         "source": {},

@@ -13,7 +13,7 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 
 三条路径：
 - **Sherpa-ONNX 流式识别**（`asr_streaming`）：音频直通 Sherpa OnlineRecognizer，无 VAD，无分段
-- **Whisper HTTP 分段识别**（`asr_chunked`）：攒块发送到兼容 OpenAI `/v1/audio/transcriptions` 的服务（whisper-server 等）
+- **Sherpa-ONNX 分段识别**（`asr_chunked`）：攒块后用 Sherpa OfflineRecognizer 逐段识别
 - **Windows 11 内建字幕**（Live Captions 模式）
 
 ## 仓库结构
@@ -21,7 +21,7 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 | 目录 | 职责 |
 |---|---|
 | `src/aria/audio/` | Windows WASAPI 音频捕获 |
-| `src/aria/transcription/` | ASR 后端（Sherpa-ONNX、whisper-http） |
+| `src/aria/transcription/` | ASR 后端（Sherpa-ONNX） |
 | `src/aria/translation/` | 翻译提供者（Google / Bing / Youdao 通过 TranslatorsLibWrapper；OpenAI-compatible） |
 | `src/aria/ui/` | PyQt6 窗口、悬浮窗、设置、托盘 |
 | `src/aria/livecaptions/` | Windows 内建字幕集成 |
@@ -36,8 +36,8 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 
 ```
 AudioCapture → PCM chunks → StreamingPipeline (按 kind 分发)
-    ├── asr_streaming: SherpaOnnxBackend.process_audio → partial result
-    └── asr_chunked: 攒块 → WhisperHttpBackend.transcribe → 完整结果
+    ├── asr_streaming: SherpaOnnxStreamingBackend.process_audio → partial result
+    └── asr_chunked: 攒块 → SherpaOnnxChunkedBackend.transcribe → 完整结果
                                                     ↓
                                               TranslationStateManager → 翻译 → UI
 ```
@@ -49,7 +49,7 @@ AudioCapture → PCM chunks → StreamingPipeline (按 kind 分发)
 
 ## 核心规则
 
-1. ASR 后端通过 `models/*.yaml` 配置驱动，支持 Sherpa-ONNX 多架构和 whisper-http
+1. ASR 后端通过 `models/*.yaml` 配置驱动，支持 Sherpa-ONNX 多架构（OnlineRecognizer 流式 + OfflineRecognizer 分段）
 2. 翻译独立于 ASR，一份转录可发送到多个翻译提供者
 3. 实时路径不使用 VAD 或分段
 4. 模型配置（yaml）放在 `models/`，权重放在 `models_cache/`；下载由用户在 Model Manager 中手动触发

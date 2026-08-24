@@ -40,8 +40,8 @@ SubtitleEvent → UI
 
 | 模式 | kind | backend | 处理方式 |
 |---|---|---|---|
-| streaming | `asr_streaming` | `SherpaOnnxBackend` | 逐帧 `process_audio()`，返回累计文本 |
-| chunked | `asr_chunked` | `WhisperHttpBackend` | 按 `chunk_seconds` 攒块，`transcribe()` 发送 HTTP 请求 |
+| streaming | `asr_streaming` | `SherpaOnnxStreamingBackend` | 逐帧 `process_audio()`，返回累计文本 |
+| chunked | `asr_chunked` | `SherpaOnnxChunkedBackend` | 按 `chunk_seconds` 攒块，`transcribe()` 用 OfflineRecognizer 识别 |
 
 ## 与翻译的交互
 

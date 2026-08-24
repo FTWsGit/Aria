@@ -2,8 +2,8 @@
 name: "0001-dual-asr-backend"
 kind: "decision"
 description: "为什么同时支持 Sherpa-ONNX 流式识别和 Whisper HTTP 分段识别两条 ASR 路径"
-status: "accepted"
-supersedes: ""
+status: "superseded"
+superseded_by: "0005-unified-sherpa-asr"
 ---
 
 # 0001. 双后端 ASR 架构
@@ -16,7 +16,7 @@ ASR 是实时字幕的核心组件，单一后端无法覆盖所有使用场景�
 
 两条 ASR 路径通过 `StreamingPipeline` 的 `mode` 参数切换，共享相同的音频捕获和翻译层：
 
-- **streaming**（`asr_streaming`）：`SherpaOnnxBackend`，音频直通 `process_audio()`，持续返回 partial result
+- **streaming**（`asr_streaming`）：`SherpaOnnxStreamingBackend`，音频直通 `process_audio()`，持续返回 partial result
 - **chunked**（`asr_chunked`）：`WhisperHttpBackend`，按 `chunk_seconds` 攒块后发送 HTTP 请求，返回完整文本
 
 两者通过 `StreamingASR` / `ChunkedASR` Protocol 提供统一接口，`pipeline.py` 按 `spec.kind` 分发到 `ASR_BACKENDS`。

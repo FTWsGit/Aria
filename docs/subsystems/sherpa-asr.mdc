@@ -13,7 +13,7 @@ alwaysApply: false
 
 ## 接口
 
-`SherpaOnnxBackend(spec: ModelSpec, model_root)` 从 `ModelSpec` 构建：
+`SherpaOnnxStreamingBackend(spec: ModelSpec, model_root)` 从 `ModelSpec` 构建：
 
 - `spec.raw["recognizer_factory"]` 决定使用哪个 `sherpa_onnx.OnlineRecognizer.from_*` 工厂方法（如 `from_transducer`、`from_paraformer`、`from_whisper`）
 - `spec.raw["files"]` 定义文件相对路径，由 `model_root` 解析为绝对路径
