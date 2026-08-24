@@ -17,13 +17,6 @@ ARIA 是一个 Windows 桌面应用，捕获系统音频或麦克风输入，在
 - Python >= 3.10。
 - 使用 uv 管理虚拟环境和依赖。
 
-用 uv 安装项目（可编辑模式 + 开发依赖）：
-
-```powershell
-uv venv
-uv sync
-```
-
 运行应用：
 
 ```powershell
@@ -40,10 +33,9 @@ uv run ruff check --fix
 uv run pytest
 ```
 
-打包/导入冒烟测试：
+打包/导入测试：
 
 ```powershell
-uv pip install -e .
 uv run python -c "import aria; print('import ok')"
 ```
 
