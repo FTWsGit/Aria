@@ -13,7 +13,7 @@ from .timezone_utils import datetime_from_timestamp, now_in_app_timezone
 
 # Global logger instance
 _logger = None
-_console_mode = "verbose"  # verbose | simple
+_log_verbosity = "verbose"  # verbose | simple
 _simple_logger = None
 _simple_file_handler = None
 _simple_log_mode = "session"
@@ -55,7 +55,7 @@ class _ConsoleModeFilter(logging.Filter):
     """Filter console logs based on selected console mode."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if _console_mode == "verbose":
+        if _log_verbosity == "verbose":
             return True
         return bool(getattr(record, "is_transcript", False))
 
@@ -64,7 +64,7 @@ class _ConsoleModeFormatter(logging.Formatter):
     """Switch console format based on current console mode."""
 
     def format(self, record: logging.LogRecord) -> str:
-        if _console_mode == "simple":
+        if _log_verbosity == "simple":
             self._style._fmt = "%(asctime)s %(message)s"
             self.datefmt = "%Y-%m-%d %H:%M:%S"
         else:
@@ -188,17 +188,17 @@ def get_logger() -> logging.Logger:
     return _logger
 
 
-def set_console_mode(mode: str) -> None:
-    """Set console output mode: verbose or simple."""
-    global _console_mode
+def set_log_verbosity(mode: str) -> None:
+    """Set log output verbosity: verbose or simple."""
+    global _log_verbosity
     if mode not in ("verbose", "simple"):
         return
-    _console_mode = mode
+    _log_verbosity = mode
 
 
-def get_console_mode() -> str:
-    """Get current console output mode."""
-    return _console_mode
+def get_log_verbosity() -> str:
+    """Get current log output verbosity."""
+    return _log_verbosity
 
 
 def start_simple_log_session() -> Path:
@@ -276,5 +276,5 @@ def transcript(msg: str):
     """Log transcript/translation line to simple log and simple console."""
     if _simple_logger is not None:
         _simple_logger.info(msg)
-    if get_console_mode() == "simple":
+    if get_log_verbosity() == "simple":
         get_logger().info(msg, extra={"is_transcript": True})

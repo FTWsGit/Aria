@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QApplication
 from ..events import SubtitleEvent, TranscriptMessage
 from ..i18n import t
 from ..livecaptions.pipeline import LiveCaptionsPipeline
-from ..logger import exception, set_console_mode, start_simple_log_session
+from ..logger import exception, set_log_verbosity, start_simple_log_session
 from ..model_manager.manager import ModelManager
 from ..model_manager.registry import ModelRegistry
 from ..pipeline import StreamingPipeline
@@ -79,7 +79,7 @@ class App:
         # Create settings window (hidden until opened from the console)
         sm = get_settings_manager()
         self._overlay_visible = sm.get("overlay_visible", True)
-        set_console_mode(sm.get("console_mode", "verbose"))
+        set_log_verbosity(sm.get("log_verbosity", "verbose"))
         set_app_timezone_name(sm.get("timezone", "system"))
 
         self._settings_window = SettingsWindow(
