@@ -11,8 +11,9 @@ from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QApplication, QFrame, QTextEdit, QVBoxLayout, QWidget
 
-from aria.settings_manager import get_settings_manager
-from aria.ui.frameless_window import FramelessWindowMixin
+from ..settings_manager import get_settings_manager
+from .frameless_window import FramelessWindowMixin
+from .styles import SUBTITLE_CONTAINER_STYLE, SUBTITLE_SOURCE_STYLE, SUBTITLE_TRANSLATION_STYLE
 
 
 class SubtitleOverlay(FramelessWindowMixin, QWidget):
@@ -89,12 +90,7 @@ class SubtitleOverlay(FramelessWindowMixin, QWidget):
         # Container frame with dark background
         self.container = QFrame()
         self.container.setObjectName("container")
-        self.container.setStyleSheet("""
-            #container {
-                background-color: rgba(42, 42, 42, 230);
-                border-radius: 12px;
-            }
-        """)
+        self.container.setStyleSheet(SUBTITLE_CONTAINER_STYLE)
         # Allow mouse events to pass through container to the resizing window
         self.container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(self.container)
@@ -113,15 +109,7 @@ class SubtitleOverlay(FramelessWindowMixin, QWidget):
         self.subtitle_label.setFrameStyle(QFrame.Shape.NoFrame)
         self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.subtitle_label.document().setDocumentMargin(20)
-        self.subtitle_label.setStyleSheet("""
-            QTextEdit {
-                color: rgba(255, 255, 255, 140);
-                font-size: 18px;
-                font-weight: normal;
-                background: transparent;
-                border: none;
-            }
-        """)
+        self.subtitle_label.setStyleSheet(SUBTITLE_SOURCE_STYLE)
         # Allow mouse events to pass through text edits
         self.subtitle_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         container_layout.addWidget(self.subtitle_label)
@@ -135,15 +123,7 @@ class SubtitleOverlay(FramelessWindowMixin, QWidget):
         self.translation_label.setFrameStyle(QFrame.Shape.NoFrame)
         self.translation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.translation_label.document().setDocumentMargin(20)
-        self.translation_label.setStyleSheet("""
-            QTextEdit {
-                color: white;
-                font-size: 24px;
-                font-weight: bold;
-                background: transparent;
-                border: none;
-            }
-        """)
+        self.translation_label.setStyleSheet(SUBTITLE_TRANSLATION_STYLE)
         self.translation_label.hide()
         # Allow mouse events to pass through text edits
         self.translation_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)

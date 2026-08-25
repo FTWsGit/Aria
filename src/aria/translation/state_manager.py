@@ -29,12 +29,16 @@ except ImportError:
 
 
 try:
+    from ..segmenter import COMMIT_COUNT, DRAFT_CHAR_THRESHOLD, DRAFT_COMMIT_THRESHOLD
     from ..segmenter import MAX_SENTENCE_LENGTH as _MAX_SENTENCE_LENGTH
     from ..segmenter import SENTENCE_DELIMITERS as _SENTENCE_DELIMITERS
 except ImportError:
     # Fallback for standalone testing
     _SENTENCE_DELIMITERS = r"[.。？！?!\n，,、]"
     _MAX_SENTENCE_LENGTH = 80
+    DRAFT_COMMIT_THRESHOLD = 6
+    COMMIT_COUNT = 4
+    DRAFT_CHAR_THRESHOLD = 150
 
 
 @dataclass
@@ -63,10 +67,10 @@ class TranslationStateManager:
     SENTENCE_DELIMITERS = _SENTENCE_DELIMITERS
     MAX_SENTENCE_LENGTH = _MAX_SENTENCE_LENGTH
 
-    # Buffer thresholds
-    DRAFT_COMMIT_THRESHOLD = 6  # Restored to 6 as requested
-    COMMIT_COUNT = 4  # Restored to 4: Commit 4 sentences at a time
-    DRAFT_CHAR_THRESHOLD = 150  # Force commit if draft exceeds this many chars
+    # Buffer thresholds (imported from segmenter.py)
+    DRAFT_COMMIT_THRESHOLD = DRAFT_COMMIT_THRESHOLD
+    COMMIT_COUNT = COMMIT_COUNT
+    DRAFT_CHAR_THRESHOLD = DRAFT_CHAR_THRESHOLD
 
     # Fuzzy matching threshold
     FUZZY_THRESHOLD = 0.65  # 65% similarity = match (Lowered for stability)
@@ -102,7 +106,11 @@ class TranslationStateManager:
 
     def process_text(self, full_source_text: str) -> TranslationState:
         """
-        Process incoming source text and return translation state.
+        Advance translation state with new source text.
+
+        This is a stateful operation: it may truncate committed content on
+        divergence, re-translate draft, promote draft to committed, and
+        populate the batch buffer for `pop_committed_batch`.
 
         Args:
             full_source_text: The complete source text from LiveCaptions
@@ -130,8 +138,9 @@ class TranslationStateManager:
         if not self._committed_sources and len(source_sentences) > self.DRAFT_COMMIT_THRESHOLD:
             source_sentences = source_sentences[-self.DRAFT_COMMIT_THRESHOLD :]
 
-        # Find where committed content ends
+        # Find where committed content ends, then truncate if diverged
         committed_end_index = self._find_committed_end(source_sentences)
+        committed_end_index = self._recommit_from_divergence(source_sentences, committed_end_index)
 
         # Everything after committed = draft portion
         draft_sources = source_sentences[committed_end_index:]
@@ -196,35 +205,33 @@ class TranslationStateManager:
         return sentences
 
     def _find_committed_end(self, source_sentences: list[str]) -> int:
-        """
-        Find where committed content ends in the source sentences.
-
-        Returns the index after the last matched committed sentence.
-        """
+        """Find where committed content ends in source sentences (read-only)."""
         if not self._committed_sources:
-            return 0  # No committed content, everything is draft
+            return 0
 
-        # Try to match committed sources in order
         matched_count = 0
-        for i, committed_src in enumerate(self._committed_sources):
+        for _i, committed_src in enumerate(self._committed_sources):
             if matched_count >= len(source_sentences):
-                # Source is shorter than committed - this shouldn't happen
-                self._committed_sources = self._committed_sources[:matched_count]
-                self._retranslate_committed()
                 break
-
-            # Fuzzy match
             similarity = self._similarity(committed_src, source_sentences[matched_count])
             if similarity >= self.FUZZY_THRESHOLD:
                 matched_count += 1
             else:
-                # Mismatch at this position - committed content has diverged
-                # Trim committed to only keep matched ones
-                self._committed_sources = self._committed_sources[:i]
-                self._retranslate_committed()
                 break
 
         return matched_count
+
+    def _recommit_from_divergence(self, source_sentences: list[str], committed_end: int) -> int:
+        """Truncate committed sources at divergence point and re-translate."""
+        if committed_end >= len(self._committed_sources):
+            return committed_end
+        if committed_end >= len(source_sentences):
+            self._committed_sources = self._committed_sources[:committed_end]
+            self._retranslate_committed()
+            return min(committed_end, len(source_sentences))
+        self._committed_sources = self._committed_sources[:committed_end]
+        self._retranslate_committed()
+        return committed_end
 
     def _retranslate_committed(self) -> None:
         """Re-translate all committed sources after trimming (rebuild paragraphs)."""
@@ -304,9 +311,10 @@ class TranslationStateManager:
         return TranslationState(committed_text=committed_text, draft_text=self._draft_translation)
 
     def pop_committed_batch(self) -> tuple[str, str] | None:
-        """Return and clear the most recently committed (source, translation) batch.
+        """Pop the most recently committed (source, translation) batch.
 
-        Returns None if nothing has committed since the last call.
+        Returns the batch and clears it - each batch is consumed at most once.
+        Returns None if nothing has been committed since the last pop.
         """
         batch = self._last_committed_batch
         self._last_committed_batch = None

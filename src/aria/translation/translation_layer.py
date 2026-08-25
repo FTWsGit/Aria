@@ -9,11 +9,25 @@ and livecaptions/pipeline.py.
 import time
 from collections import namedtuple
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from ..events import TranscriptMessage
 from ..logger import debug, warning
 from ..segmenter import PlainSentenceSegmenter
 from .state_manager import TranslationStateManager
+
+
+@dataclass
+class OpenAIConfig:
+    """Configuration for OpenAI-compatible translator."""
+
+    endpoint: str = "http://127.0.0.1:1234/v1"
+    api_key: str = ""
+    model_name: str = ""
+    temperature: float = 0.2
+    max_tokens: int = 1024
+    system_prompt: str = ""
+
 
 try:
     from .translator import create_translator
@@ -23,9 +37,7 @@ except ImportError:
     TRANSLATION_AVAILABLE = False
     create_translator = None  # type: ignore[assignment]
 
-TranslationProcessResult = namedtuple(
-    "TranslationProcessResult", ["committed_text", "draft_text", "batch"]
-)
+TranslationProcessResult = namedtuple("TranslationProcessResult", ["committed_text", "draft_text", "batch"])
 
 
 class TranslationLayer:
@@ -42,17 +54,13 @@ class TranslationLayer:
         enable_translation: bool,
         translation_engine: str,
         target_language: str,
-        openai_endpoint: str,
-        openai_api_key: str,
-        openai_model_name: str,
-        openai_temperature: float,
-        openai_max_tokens: int,
-        openai_system_prompt: str,
+        openai_config: OpenAIConfig,
         on_message: Callable[[TranscriptMessage], None] | None,
     ):
         self._translator = None
         self._state_manager = None
         self._plain_segmenter: PlainSentenceSegmenter | None = None
+        self._enabled = enable_translation
         self._on_message = on_message
         self._msg_seq = 0
 
@@ -61,12 +69,12 @@ class TranslationLayer:
                 self._translator = create_translator(
                     engine=translation_engine,
                     target_language=target_language,
-                    openai_endpoint=openai_endpoint,
-                    openai_api_key=openai_api_key,
-                    openai_model_name=openai_model_name,
-                    openai_temperature=openai_temperature,
-                    openai_max_tokens=openai_max_tokens,
-                    openai_system_prompt=openai_system_prompt,
+                    openai_endpoint=openai_config.endpoint,
+                    openai_api_key=openai_config.api_key,
+                    openai_model_name=openai_config.model_name,
+                    openai_temperature=openai_config.temperature,
+                    openai_max_tokens=openai_config.max_tokens,
+                    openai_system_prompt=openai_config.system_prompt,
                 )
                 self._state_manager = TranslationStateManager(translator=self._translator.translate)
                 debug("TranslationLayer: initialized")
@@ -131,9 +139,19 @@ class TranslationLayer:
     # ------------------------------------------------------------------
 
     @property
-    def is_active(self) -> bool:
-        """True when translation is enabled and a translator was created."""
+    def is_enabled(self) -> bool:
+        """Whether translation was toggled on by the user."""
+        return self._enabled
+
+    @property
+    def is_ready(self) -> bool:
+        """Whether the translator client was successfully instantiated."""
         return self._state_manager is not None
+
+    @property
+    def is_active(self) -> bool:
+        """Deprecated alias for is_ready."""
+        return self.is_ready
 
     @property
     def target_language(self) -> str | None:

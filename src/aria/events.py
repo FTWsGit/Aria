@@ -17,9 +17,8 @@ class SubtitleEvent:
     confidence: float
     timestamp: float
     is_partial: bool = False
-    translated_text: str | None = None  # Translation (if enabled)
     target_language: str | None = None  # Target language for translation
-    # Dual-buffer support
+    # Dual-buffer translation (replaces legacy translated_text)
     committed_translation: str | None = None
     draft_translation: str | None = None
 

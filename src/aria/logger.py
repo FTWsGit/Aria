@@ -278,3 +278,12 @@ def transcript(msg: str):
         _simple_logger.info(msg)
     if get_log_verbosity() == "simple":
         get_logger().info(msg, extra={"is_transcript": True})
+
+
+def reset_logger_state() -> None:
+    """Reset all module-level logger state so tests can start fresh."""
+    global _logger, _simple_logger, _simple_file_handler, _log_verbosity
+    _logger = None
+    _simple_logger = None
+    _simple_file_handler = None
+    _log_verbosity = "verbose"

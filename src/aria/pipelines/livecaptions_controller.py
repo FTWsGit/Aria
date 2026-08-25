@@ -24,6 +24,30 @@ except ImportError:
 from ..logger import debug, error, info, warning
 
 
+def is_windows_11() -> bool:
+    """Check if running on Windows 11 (build >= 22000)."""
+    try:
+        import platform
+
+        version = platform.version()
+        parts = version.split(".")
+        if len(parts) >= 3:
+            build = int(parts[2].split("-")[0])
+            return build >= 22000
+        return False
+    except Exception as e:
+        warning(f"LiveCaptionsController: Error checking Windows version: {e}")
+        return False
+
+
+def is_livecaptions_available() -> bool:
+    """Check if LiveCaptions feature is available on this system."""
+    if not is_windows_11():
+        debug("LiveCaptionsController: Not Windows 11")
+        return False
+    return True
+
+
 class LiveCaptionsController:
     """
     Controls the launch and configuration of Windows LiveCaptions
@@ -31,31 +55,13 @@ class LiveCaptionsController:
 
     @staticmethod
     def is_windows_11() -> bool:
-        """Check if running on Windows 11"""
-        try:
-            import platform
-
-            version = platform.version()
-            # Windows 11 build number >= 10.0.22000
-            parts = version.split(".")
-            if len(parts) >= 3:
-                build = int(parts[2].split("-")[0])  # Handle format like "10.0.22000-xxx"
-                return build >= 22000
-            return False
-        except Exception as e:
-            warning(f"LiveCaptionsController: Error checking Windows version: {e}")
-            return False
+        """Check if running on Windows 11 (delegates to module-level function)."""
+        return is_windows_11()
 
     @staticmethod
     def is_livecaptions_available() -> bool:
-        """Check if LiveCaptions feature is available"""
-        if not LiveCaptionsController.is_windows_11():
-            debug("LiveCaptionsController: Not Windows 11")
-            return False
-
-        # Can add more checks, such as registry or system settings
-        # But basically all Windows 11 systems have this feature
-        return True
+        """Check if LiveCaptions feature is available (delegates to module-level function)."""
+        return is_livecaptions_available()
 
     @staticmethod
     def launch_livecaptions() -> bool:

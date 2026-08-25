@@ -93,5 +93,12 @@ def get_language_options() -> list:
     return [(name, code) for code, (name, _) in LANGUAGES.items()]
 
 
+def reset_language_cache() -> None:
+    """Clear cached language state so tests can start fresh."""
+    global _current_language, _translations
+    _current_language = None
+    _translations = {}
+
+
 # Convenience alias
 t = get_text

@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ...i18n import t
+from ..styles import OPENAI_OVERLAY_STYLE
 
 
 class TranslationTabMixin:
@@ -82,67 +83,7 @@ class TranslationTabMixin:
         """Create the OpenAI config overlay panel. Covers the content area."""
         self.openai_overlay = QFrame(parent)
         self.openai_overlay.setObjectName("openai_overlay")
-        self.openai_overlay.setStyleSheet("""
-            QFrame#openai_overlay {
-                background-color: #ffffff;
-                border: 1px solid #d0d0d0;
-                border-radius: 8px;
-            }
-            QLabel {
-                color: #1a1a1a;
-                font-size: 13px;
-            }
-            QLineEdit, QDoubleSpinBox, QSpinBox {
-                background-color: #ffffff;
-                color: #1a1a1a;
-                border: 1px solid #c0c0c0;
-                border-radius: 4px;
-                padding: 6px 10px;
-            }
-            QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
-                border-color: #0078D4;
-            }
-            QSpinBox::up-button, QDoubleSpinBox::up-button {
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 20px;
-                height: 14px;
-                background-color: #e8e8e8;
-                border-radius: 3px;
-                margin: 2px 2px 0 0;
-            }
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
-                background-color: #0078D4;
-            }
-            QSpinBox::down-button, QDoubleSpinBox::down-button {
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 20px;
-                height: 14px;
-                background-color: #e8e8e8;
-                border-radius: 3px;
-                margin: 0 2px 2px 0;
-            }
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-                background-color: #0078D4;
-            }
-            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-bottom: 6px solid #444444;
-                width: 0px;
-                height: 0px;
-            }
-            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 6px solid #444444;
-                width: 0px;
-                height: 0px;
-            }
-        """)
+        self.openai_overlay.setStyleSheet(OPENAI_OVERLAY_STYLE)
         self.openai_overlay.hide()
 
         overlay_layout = QVBoxLayout(self.openai_overlay)

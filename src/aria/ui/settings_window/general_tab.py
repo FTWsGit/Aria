@@ -110,7 +110,7 @@ class GeneralTabMixin:
 
         if result == QMessageBox.StandardButton.Yes:
             settings = get_settings_manager()
-            settings_path = settings._config_file
+            settings_path = settings.config_file_path
             if settings_path.exists():
                 settings_path.unlink()
 

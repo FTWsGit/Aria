@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from ..logger import debug, info, warning
+from ..logger import debug, info
 
 try:
     import pyaudiowpatch as pyaudio
@@ -52,9 +52,6 @@ class AudioCapture:
         self._callback: Callable[[np.ndarray, int], None] | None = None
         self._capture_thread: threading.Thread | None = None
         self._source = source
-        if self._source == "ts_tail":
-            warning("AudioCapture: 'ts_tail' has been removed, fallback to system audio")
-            self._source = "system"
 
     def _get_loopback_device(self) -> dict:
         """Find the WASAPI loopback device for the default output."""

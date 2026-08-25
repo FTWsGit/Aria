@@ -14,14 +14,14 @@ from PyQt6.QtWidgets import QApplication
 
 from ..events import SubtitleEvent, TranscriptMessage
 from ..i18n import t
-from ..livecaptions.pipeline import LiveCaptionsPipeline
 from ..logger import exception, set_log_verbosity, start_simple_log_session
 from ..model_manager.manager import ModelManager
 from ..model_manager.registry import ModelRegistry
-from ..pipeline import StreamingPipeline
+from ..pipelines import LiveCaptionsPipeline, StreamingPipeline
 from ..settings_manager import get_settings_manager
 from ..timezone_utils import set_app_timezone_name
 from .console_window import ConsoleWindow
+from .pipeline_factory import PipelineFactory
 from .settings_window import SettingsWindow
 from .subtitle_overlay import SubtitleOverlay
 from .system_tray import SystemTray
@@ -227,41 +227,14 @@ class App:
         def create_pipeline():
             try:
                 if self._is_livecaptions_mode:
-                    # Use Windows LiveCaptions
-                    self._pipeline = LiveCaptionsPipeline(
-                        on_subtitle=lambda e: self._signals.subtitle.emit(e),
-                        on_message=lambda m: self._signals.message.emit(m),
-                        enable_translation=self._enable_translation,
-                        translation_engine=settings.get("translation_engine", "google"),
-                        target_language=settings.get("target_language", "zho_Hant"),
-                        auto_hide_window=False,  # Keep Windows LiveCaptions window visible
-                        openai_endpoint=settings.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
-                        openai_api_key=settings.get("openai_api_key", ""),
-                        openai_model_name=settings.get("openai_model_name", ""),
-                        openai_temperature=settings.get("openai_temperature", 0.2),
-                        openai_max_tokens=settings.get("openai_max_tokens", 1024),
-                        openai_system_prompt=settings.get("openai_system_prompt", ""),
-                    )
+                    self._pipeline = PipelineFactory.create_livecaptions_pipeline(settings, self._signals)
                 else:
-                    # Use Sherpa-ONNX streaming pipeline
-                    model_id = settings.get("model_id") or "sherpa-zh-en-zipformer"
-                    self._pipeline = StreamingPipeline(
-                        model_id=model_id,
-                        registry=self._registry,
-                        model_manager=self._model_manager,
-                        on_subtitle=lambda e: self._signals.subtitle.emit(e),
-                        on_error=lambda msg: self._signals.error.emit(msg),
-                        on_message=lambda m: self._signals.message.emit(m),
-                        enable_translation=self._enable_translation,
-                        translation_engine=settings.get("translation_engine", "google"),
-                        target_language=settings.get("target_language", "zho_Hant"),
-                        audio_source=settings.get("audio_source", "system"),
-                        openai_endpoint=settings.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
-                        openai_api_key=settings.get("openai_api_key", ""),
-                        openai_model_name=settings.get("openai_model_name", ""),
-                        openai_temperature=settings.get("openai_temperature", 0.2),
-                        openai_max_tokens=settings.get("openai_max_tokens", 1024),
-                        openai_system_prompt=settings.get("openai_system_prompt", ""),
+                    self._pipeline = PipelineFactory.create_streaming_pipeline(
+                        settings,
+                        self._registry,
+                        self._model_manager,
+                        self._signals,
+                        lambda msg: self._signals.error.emit(msg),
                     )
 
                 self._pipeline.start()
@@ -326,8 +299,6 @@ class App:
                 committed_translation=event.committed_translation,
                 draft_translation=event.draft_translation,
             )
-        elif event.translated_text:
-            self._overlay.update_subtitle(event.text, event.language, translated_text=event.translated_text)
         else:
             self._overlay.update_subtitle(event.text, event.language)
 

@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 from ...i18n import LANGUAGES, get_current_language, set_language, t
 from ...settings_manager import get_settings_manager
 from ...timezone_utils import validate_timezone_name
+from ..styles import MAIN_STYLESHEET
 from .general_tab import GeneralTabMixin
 from .recognition_tab import RecognitionTabMixin
 from .translation_tab import TranslationTabMixin
@@ -127,133 +128,7 @@ class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, Gene
 
     def _get_stylesheet(self):
         """Return the main stylesheet: a plain, light Windows-style theme."""
-        return """
-            QMainWindow {
-                background-color: #f3f3f3;
-            }
-            QLabel {
-                color: #1a1a1a;
-            }
-            QFrame#card {
-                background-color: #ffffff;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-            }
-            QFrame#title_label {
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton {
-                background-color: #0078D4;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 18px;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #106EBE;
-            }
-            QPushButton:pressed {
-                background-color: #005A9E;
-            }
-            QPushButton#secondary {
-                background-color: #ffffff;
-                border: 1px solid #c0c0c0;
-                color: #1a1a1a;
-            }
-            QPushButton#secondary:hover {
-                background-color: #f0f0f0;
-            }
-            QComboBox {
-                background-color: #ffffff;
-                color: #1a1a1a;
-                border: 1px solid #c0c0c0;
-                border-radius: 4px;
-                padding: 6px 10px;
-                min-width: 180px;
-            }
-            QComboBox::drop-down {
-                subcontrol-origin: padding;
-                subcontrol-position: center right;
-                width: 20px;
-                border: none;
-                background: transparent;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #ffffff;
-                color: #1a1a1a;
-                selection-background-color: #0078D4;
-                selection-color: white;
-                border: 1px solid #c0c0c0;
-            }
-            QCheckBox {
-                color: #1a1a1a;
-            }
-            QCheckBox::indicator {
-                width: 18px;
-                height: 18px;
-                border-radius: 3px;
-                border: 1px solid #a0a0a0;
-                background-color: #ffffff;
-            }
-            QCheckBox::indicator:hover {
-                border-color: #0078D4;
-            }
-            QCheckBox::indicator:checked {
-                background-color: #0078D4;
-                border-color: #0078D4;
-                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTMgOC41TDYuNSAxMkwxMyA0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
-            }
-            QCheckBox::indicator:checked:hover {
-                background-color: #106EBE;
-                border-color: #106EBE;
-            }
-            QComboBox:hover {
-                border-color: #0078D4;
-            }
-            QTabWidget::pane {
-                border: 1px solid #d0d0d0;
-                top: -1px;
-                background: #ffffff;
-            }
-            QTabBar::tab {
-                background: #e8e8e8;
-                color: #444444;
-                padding: 8px 18px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                margin-right: 2px;
-            }
-            QTabBar::tab:selected {
-                background: #ffffff;
-                color: #0078D4;
-                font-weight: bold;
-            }
-            QTabBar::tab:hover {
-                background: #f0f0f0;
-            }
-            QScrollBar:vertical {
-                background-color: transparent;
-                width: 10px;
-                margin: 0;
-                border: none;
-            }
-            QScrollBar::handle:vertical {
-                background-color: rgba(0, 0, 0, 0.18);
-                border-radius: 5px;
-                min-height: 30px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(0, 0, 0, 0.30);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """
+        return MAIN_STYLESHEET
 
     def _create_ui(self):
         """Create all UI components."""

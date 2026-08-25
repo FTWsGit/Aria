@@ -12,16 +12,17 @@ from collections.abc import Callable
 
 import numpy as np
 
-from .audio.capture import AudioCapture
-from .events import SubtitleEvent, TranscriptMessage
-from .logger import debug, exception, info, transcript
+from ..audio.capture import AudioCapture
+from ..events import SubtitleEvent, TranscriptMessage
+from ..logger import exception, info, transcript
 
 # Import ASR backends and model registry
-from .model_manager.manager import ModelManager
-from .model_manager.registry import ModelRegistry
-from .transcription.base import ChunkedASR, StreamingASR
-from .transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
-from .translation.translation_layer import TranslationLayer
+from ..model_manager.manager import ModelManager
+from ..model_manager.registry import ModelRegistry
+from ..transcription.base import ChunkedASR, StreamingASR
+from ..transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
+from ..translation.translation_layer import OpenAIConfig, TranslationLayer
+from .base import BasePipeline
 
 STREAMING_BACKENDS = {
     "sherpa_onnx": SherpaOnnxStreamingBackend,
@@ -32,7 +33,7 @@ CHUNKED_BACKENDS = {
 }
 
 
-class StreamingPipeline:
+class StreamingPipeline(BasePipeline):
     """
     Config-driven streaming ASR pipeline.
 
@@ -59,12 +60,7 @@ class StreamingPipeline:
         target_language: str = "zh",
         audio_source: str = "system",
         # OpenAI translator settings
-        openai_endpoint: str = "http://127.0.0.1:1234/v1",
-        openai_api_key: str = "",
-        openai_model_name: str = "",
-        openai_temperature: float = 0.2,
-        openai_max_tokens: int = 1024,
-        openai_system_prompt: str = "",
+        openai_config: OpenAIConfig | None = None,
     ):
         """
         Initialize the streaming pipeline.
@@ -80,7 +76,7 @@ class StreamingPipeline:
             target_language: Target language for translation
             audio_source: "system" or "mic:..." for microphone
         """
-        self.on_subtitle = on_subtitle or self._default_callback
+        super().__init__(on_subtitle=on_subtitle)
         self._on_error = on_error
         self._on_message = on_message
         self.max_lines = max_lines
@@ -109,16 +105,12 @@ class StreamingPipeline:
             raise ValueError(f"Unsupported ASR kind: {spec.kind}")
 
         # Translation layer (handles translator, state manager, segmenter)
+        _openai_cfg = openai_config or OpenAIConfig()
         self._translation_layer = TranslationLayer(
             enable_translation=enable_translation,
             translation_engine=translation_engine,
             target_language=target_language,
-            openai_endpoint=openai_endpoint,
-            openai_api_key=openai_api_key,
-            openai_model_name=openai_model_name,
-            openai_temperature=openai_temperature,
-            openai_max_tokens=openai_max_tokens,
-            openai_system_prompt=openai_system_prompt,
+            openai_config=_openai_cfg,
             on_message=on_message,
         )
 
@@ -126,7 +118,6 @@ class StreamingPipeline:
         self._audio_capture = AudioCapture(source=audio_source)
 
         # State
-        self._running = False
         self._audio_queue: queue.Queue = queue.Queue()
         self._process_thread: threading.Thread | None = None
 
@@ -147,12 +138,8 @@ class StreamingPipeline:
         self._consecutive_translation_failures: int = 0
         self._asr_fatal: bool = False
 
-        trans_status = "enabled (incremental)" if self._translation_layer.is_active else "disabled"
+        trans_status = "enabled (incremental)" if self._translation_layer.is_ready else "disabled"
         info(f"StreamingPipeline: mode={self._mode}, backend={spec.backend}, translation={trans_status}")
-
-    def _default_callback(self, event: SubtitleEvent) -> None:
-        """Default subtitle callback."""
-        debug(f"[{event.language}] {event.text}")
 
     def _on_audio(self, audio: np.ndarray, sample_rate: int) -> None:
         """Callback from AudioCapture."""
@@ -215,7 +202,7 @@ class StreamingPipeline:
             transcript(raw_text)
 
             # If no translation, emit immediately
-            if not self._translation_layer.is_active:
+            if not self._translation_layer.is_ready:
                 event = SubtitleEvent(
                     text=raw_text,
                     language="",
