@@ -12,9 +12,10 @@ from PyQt6.QtGui import QColor, QPainter
 from PyQt6.QtWidgets import QApplication, QFrame, QTextEdit, QVBoxLayout, QWidget
 
 from aria.settings_manager import get_settings_manager
+from aria.ui.frameless_window import FramelessWindowMixin
 
 
-class SubtitleOverlay(QWidget):
+class SubtitleOverlay(FramelessWindowMixin, QWidget):
     """
     Transparent floating subtitle overlay using PyQt6.
 
@@ -42,8 +43,10 @@ class SubtitleOverlay(QWidget):
         self._on_close_callback = on_close
         self._close_fired = False
 
-        # Drag/Resize state
-        self._drag_pos: QPoint | None = None
+        # Drag state (provided by FramelessWindowMixin)
+        self._init_drag_state()
+
+        # Resize state
         self._resize_edge: int | None = None
         self._initial_geometry = None
 
@@ -248,10 +251,10 @@ class SubtitleOverlay(QWidget):
                 # Start Resize
                 self._resize_edge = edge
                 self._initial_geometry = self.geometry()
-                self._drag_pos = event.globalPosition().toPoint()
+                self._resize_anchor = event.globalPosition().toPoint()
             else:
                 # Start Move (if not on edges)
-                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                self.start_window_drag(event.globalPosition().toPoint(), self)
 
             event.accept()
 
@@ -275,18 +278,17 @@ class SubtitleOverlay(QWidget):
                 return
 
             # Moving
-            if self._drag_pos and self._resize_edge is None:
-                self.move(event.globalPosition().toPoint() - self._drag_pos)
+            if self.move_window_during_drag(event.globalPosition().toPoint(), self):
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 event.accept()
 
     def _handle_resize(self, global_mouse_pos: QPoint):
         """Calculate and apply new geometry during resize."""
-        if not self._initial_geometry or not self._drag_pos:
+        if not self._initial_geometry or not self._resize_anchor:
             return
 
         initial = self._initial_geometry
-        delta = global_mouse_pos - self._drag_pos
+        delta = global_mouse_pos - self._resize_anchor
 
         x, y, w, h = initial.x(), initial.y(), initial.width(), initial.height()
         dx, dy = delta.x(), delta.y()
@@ -322,10 +324,10 @@ class SubtitleOverlay(QWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             # End ops
             self._resize_edge = None
-            self._drag_pos = None
+            self._resize_anchor = None
             self._initial_geometry = None
 
-            self._save_position()
+            self.end_window_drag(on_save=self._save_position)
 
             # Reset cursor
             self._update_cursor(self._hit_test(event.pos()))

@@ -11,7 +11,7 @@ streamer/operator: history, controls, and monitoring live in here.
 
 from datetime import datetime
 
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -27,31 +27,31 @@ from PyQt6.QtWidgets import (
 
 from ..events import TranscriptMessage
 from ..i18n import t
+from .frameless_window import FramelessWindowMixin
 
 MAX_MESSAGES = 200  # Cap history so the widget list doesn't grow unbounded
 
 
-class _DragHeader(QWidget):
+class _DragHeader(FramelessWindowMixin, QWidget):
     """Thin header strip; click-dragging it moves the parent window."""
 
     def __init__(self, parent_window: "ConsoleWindow"):
         super().__init__()
         self._window = parent_window
-        self._drag_offset: QPoint | None = None
+        self._init_drag_state()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_offset = event.globalPosition().toPoint() - self._window.pos()
+            self.start_window_drag(event.globalPosition().toPoint(), self._window)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if self._drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            self._window.move(event.globalPosition().toPoint() - self._drag_offset)
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            self.move_window_during_drag(event.globalPosition().toPoint(), self._window)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._drag_offset = None
-        self._window.request_save_geometry()
+        self.end_window_drag(on_save=self._window.request_save_geometry)
         super().mouseReleaseEvent(event)
 
 
