@@ -1,10 +1,5 @@
 # AGENTS.md
 
-## 铁律
-- 使用中文和用户交流
-- 优先向用户确认而非直接动手修改
-- 调用工具(tool callling)之前，必须要简述现在要做什么，表明工具调用动机。不超过20个字
-
 ## 项目概述
 
 ARIA 是一个 Windows 桌面应用，捕获系统音频或麦克风输入，在可移动的 PyQt6 悬浮窗中实时渲染转录文本。目前有两条识别路径：Sherpa-ONNX 流式识别和 Windows 11 内建字幕。翻译是独立层，支持在线和本地。项目要求 Python 3.10+，仅支持 Windows。
@@ -70,3 +65,8 @@ uv run python -c "import aria; print('import ok')"
 - 修改 `audio/` 时同时测试系统音频和麦克风路径。
 - 注意设备枚举、默认设备变更、采样率和停止/重启时的资源清理。
 - 不要假设需要或已获得管理员权限。
+
+## Working Rules(IMPORTANT!)
+- Use Chinese to talk with user
+- Never work with project when user did not ask for it
+- Before each batch of tool calls, say in ONE short sentence, in the user's language (no more than ~12 words), what you're about to do.
