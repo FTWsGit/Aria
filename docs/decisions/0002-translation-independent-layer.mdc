@@ -24,6 +24,6 @@ ASR 和翻译是两个独立的变化轴：ASR 负责语音→文本，翻译负
 ## 后果
 
 - 优点：翻译引擎（Google/Bing/Youdao/OpenAI）可热切换，不影响音频捕获和 ASR
-- 代价：`TranslationStateManager` 文件位于 `livecaptions/manager.py`，但服务于双管道——这是位置异常的共享组件，文档需明确标注
+- 代价：`TranslationStateManager` 位于 `translation/state_manager.py`，被 `pipeline.py` 和 `livecaptions/pipeline.py` 共同 import
 - 翻译在后台线程执行，网络阻塞不阻塞 ASR
 - Aria 不下载、不缓存、不管理任何翻译模型权重

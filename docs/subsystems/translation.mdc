@@ -38,7 +38,7 @@ result = translator.translate("hello")
 
 ## TranslationStateManager
 
-位于 `livecaptions/manager.py`（注意：此文件归属 `livecaptions/` 但服务于双管道，是共享组件，非 Live Captions 独有）。被 `pipeline.py`（实时管道）和 `livecaptions/pipeline.py`（Live Captions 管道）共同 import。
+位于 `translation/state_manager.py`，被 `pipeline.py`（实时管道）和 `livecaptions/pipeline.py`（Live Captions 管道）共同 import。
 
 - `process_text(raw_text)` → `TranslationState`（含 committed_text 和 draft_text）
 - 滑动窗口 + 模糊匹配，区分已提交翻译和草稿翻译

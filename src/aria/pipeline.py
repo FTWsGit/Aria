@@ -35,7 +35,7 @@ except ImportError as e:
     create_translator = None
 
 # TranslationStateManager for incremental translation
-from .livecaptions.manager import TranslationStateManager
+from .translation.state_manager import TranslationStateManager
 
 STREAMING_BACKENDS = {
     "sherpa_onnx": SherpaOnnxStreamingBackend,

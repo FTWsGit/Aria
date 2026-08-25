@@ -1,4 +1,4 @@
-from aria.livecaptions.manager import TranslationStateManager
+from aria.translation.state_manager import TranslationStateManager
 
 
 def fake_translator(text: str) -> str:

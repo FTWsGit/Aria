@@ -9,8 +9,8 @@ from collections.abc import Callable
 from ..events import SubtitleEvent, TranscriptMessage
 from ..logger import debug, error, info, warning
 from ..segmenter import PlainSentenceSegmenter
+from ..translation.state_manager import TranslationStateManager
 from .controller import LiveCaptionsController
-from .manager import TranslationStateManager
 from .monitor import CaptionEvent, LiveCaptionsMonitor
 
 # Translation support (optional)
