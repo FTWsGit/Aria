@@ -7,6 +7,36 @@ Saves and loads user settings to a JSON file.
 import json
 from pathlib import Path
 
+# 设置项索引（全仓库实际使用的 key）
+# === 已登记（在 DEFAULT_SETTINGS 中有默认值） ===
+#   mode              — 识别模式 (asr / livecaptions)
+#   min_duration      — 最小显示时长 (ms)
+#   enable_translation — 是否启用翻译
+#   translation_engine — 翻译引擎 (bing / google_free / openai / youdao)
+#   target_language   — 目标语言代码
+#   audio_source      — 音频源 (system / microphone)
+#   timezone          — 时区
+#   overlay_visible   — 悬浮窗可见性
+#   log_verbosity     — 日志详略
+#   openai_endpoint   — OpenAI 兼容端点
+#   openai_api_key    — OpenAI API Key
+#   openai_model_name — OpenAI 模型名
+#   openai_temperature — OpenAI 温度
+#   openai_max_tokens — OpenAI 最大 token 数
+#   openai_system_prompt — OpenAI 系统提示词
+#   ui_language       — UI 语言代码
+#
+# === 未登记（在各处用 .get() 兜底，无 DEFAULT_SETTINGS 条目） ===
+#   model_id          — ASR 模型 ID（settings_window.py / app.py）
+#   language          — UI 语言（settings_window.py 保存时写入，i18n 读时用 ui_language）
+#   console_topmost   — 控制台窗口置顶（app.py）
+#   console_auto_scroll — 控制台自动滚动（app.py）
+#   console_x         — 控制台窗口 X 坐标（app.py）
+#   console_y         — 控制台窗口 Y 坐标（app.py）
+#   console_w         — 控制台窗口宽度（app.py）
+#   console_h         — 控制台窗口高度（app.py）
+#   overlay_x         — 悬浮窗 X 坐标（subtitle_overlay.py，position_key="overlay"）
+#   overlay_y         — 悬浮窗 Y 坐标（subtitle_overlay.py，position_key="overlay"）
 
 class SettingsManager:
     """Manages saving and loading user settings."""
@@ -20,7 +50,7 @@ class SettingsManager:
         "audio_source": "system",
         "timezone": "system",
         "overlay_visible": True,
-        "console_mode": "verbose",
+        "log_verbosity": "verbose",
         "openai_endpoint": "http://127.0.0.1:1234/v1",
         "openai_api_key": "",
         "openai_model_name": "",
