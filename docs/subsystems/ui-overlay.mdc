@@ -11,9 +11,10 @@ alwaysApply: false
 
 | 文件 | 组件 | 职责 |
 |---|---|---|
-| `app.py` | `App` | 应用协调器，管理 pipeline、overlay、tray 生命周期 |
-| `settings_window.py` | `SettingsWindow` | 主设置窗口：模式选择、音频源、翻译配置、时区 |
-| `subtitle_overlay.py` | `SubtitleOverlay` | 可拖拽/调整大小的悬浮窗，双色渲染（committed+draft） |
+| `app.py` | `App` | 应用协调器，管理 pipeline、overlay、console、tray 生命周期 |
+| `console_window.py` | `ConsoleWindow` | 操作员控制台：转录历史、启动/停止、清除、设置、退出 |
+| `settings_window.py` | `SettingsWindow` | 独立设置窗口：模式选择、音频源、翻译配置、时区 |
+| `subtitle_overlay.py` | `SubtitleOverlay` | 可拖拽/调整大小的悬浮窗，原文（淡化）+ 译文（突出）同窗渲染 |
 | `system_tray.py` | `SystemTray` | 系统托盘图标和菜单 |
 | `model_manager_window.py` | `ModelManagerWindow` | 模型下载/管理界面 |
 
@@ -25,12 +26,12 @@ alwaysApply: false
 
 ## 模式
 
-- **实时模式**：Sherpa-ONNX 流式识别，显示原文 + 翻译两个悬浮窗
-- **Live Captions 模式**：Windows 内建字幕显示原文，仅显示翻译悬浮窗
+- **实时模式**：Sherpa-ONNX 流式识别，原文（淡化）+ 译文（突出）同窗显示
+- **Live Captions 模式**：Windows 内建字幕 + 可选翻译，与实时模式共用同一悬浮窗
 
 ## 设置持久化
 
-`SettingsWindow._gather_settings()` → `SettingsManager.set()` → `SettingsManager.save()` → JSON 文件
+`SettingsWindow.get_settings()` → `SettingsManager.set()` → `SettingsManager.save()` → JSON 文件
 
 ## 不变式
 
