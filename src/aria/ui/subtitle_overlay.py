@@ -101,7 +101,7 @@ class SubtitleOverlay(QWidget):
         container_layout.setContentsMargins(8, 6, 8, 6)
         container_layout.setSpacing(5)
 
-        # Subtitle label (main text)
+        # Subtitle label (main text) — dimmed, since translation is now primary
         self.subtitle_label = QTextEdit()
         self.subtitle_label.setReadOnly(True)
         self.subtitle_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
@@ -112,9 +112,9 @@ class SubtitleOverlay(QWidget):
         self.subtitle_label.document().setDocumentMargin(20)
         self.subtitle_label.setStyleSheet("""
             QTextEdit {
-                color: white;
-                font-size: 24px;
-                font-weight: bold;
+                color: rgba(255, 255, 255, 140);
+                font-size: 18px;
+                font-weight: normal;
                 background: transparent;
                 border: none;
             }
@@ -123,7 +123,7 @@ class SubtitleOverlay(QWidget):
         self.subtitle_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         container_layout.addWidget(self.subtitle_label)
 
-        # Translation label
+        # Translation label — the primary, prominent line
         self.translation_label = QTextEdit()
         self.translation_label.setReadOnly(True)
         self.translation_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
@@ -134,8 +134,9 @@ class SubtitleOverlay(QWidget):
         self.translation_label.document().setDocumentMargin(20)
         self.translation_label.setStyleSheet("""
             QTextEdit {
-                color: #90EE90;
-                font-size: 20px;
+                color: white;
+                font-size: 24px;
+                font-weight: bold;
                 background: transparent;
                 border: none;
             }
@@ -422,42 +423,21 @@ class SubtitleOverlay(QWidget):
 
     def set_multiline_mode(self, enabled: bool) -> None:
         """Enable multiline mode (taller overlay)."""
+        dimmed_size = "16px" if enabled else "18px"
         if enabled:
             self._window_height = 180
-            self.subtitle_label.setStyleSheet("""
-                QTextEdit {
-                    color: white;
-                    font-size: 22px;
-                    font-weight: bold;
-                    background: transparent;
-                    border: none;
-                }
-            """)
         else:
             self._window_height = 120
-            self.subtitle_label.setStyleSheet("""
-                QTextEdit {
-                    color: white;
-                    font-size: 24px;
-                    font-weight: bold;
-                    background: transparent;
-                    border: none;
-                }
-            """)
+        self.subtitle_label.setStyleSheet(f"""
+            QTextEdit {{
+                color: rgba(255, 255, 255, 140);
+                font-size: {dimmed_size};
+                font-weight: normal;
+                background: transparent;
+                border: none;
+            }}
+        """)
         self.resize(self._window_width, self._window_height)
-
-    def set_translation_mode(self, enabled: bool) -> None:
-        """Configure as translation overlay (green text)."""
-        if enabled:
-            self.subtitle_label.setStyleSheet("""
-                QTextEdit {
-                    color: #90EE90;
-                    font-size: 24px;
-                    font-weight: bold;
-                    background: transparent;
-                    border: none;
-                }
-            """)
 
 
 # Test

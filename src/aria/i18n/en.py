@@ -114,7 +114,7 @@ TRANSLATIONS = {
     "model_required_download_title": "Model Not Downloaded",
     "model_required_download_msg": "Model '{model_id}' has not been downloaded.\nPlease download it in Model Manager first.",
     # Tray menu
-    "tray_show_settings": "Show Settings",
+    "tray_show_settings": "Show Main Window",
     "tray_toggle_subtitles": "Start/Stop Subtitles",
     "tray_quit": "Quit",
     # Audio source
@@ -135,4 +135,16 @@ TRANSLATIONS = {
     "close": "Close",
     "configure": "Configure",
     "back": "Back",
+    # Console window
+    "console_title": "ARIA Console",
+    "btn_clear": "Clear",
+    "btn_settings": "Settings",
+    "btn_quit": "Quit",
+    "chk_topmost": "Always on Top",
+    "chk_auto_scroll": "Auto Scroll",
+    # Settings window tabs
+    "tab_recognition": "Recognition",
+    "tab_translation": "Translation",
+    "tab_general": "General",
+    "settings_window_title": "ARIA Settings",
 }

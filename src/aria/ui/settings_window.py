@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -42,9 +43,6 @@ class SettingsWindow(QMainWindow):
 
     # Model options
     LANGUAGE_CODES = [None, "zh", "en", "ja", "ko", "yue", "es", "fr", "de"]
-
-    # Signal for thread-safe updates
-    status_update = pyqtSignal(str, str)  # text, color
 
     @staticmethod
     def _get_asr_languages():
@@ -90,26 +88,28 @@ class SettingsWindow(QMainWindow):
 
     def __init__(
         self,
-        on_start: Callable[[dict], None],
         on_quit: Callable[[], None] | None = None,
         on_toggle_overlay: Callable[[], bool] | None = None,
     ):
         """Initialize the settings window.
 
         Args:
-            on_start: Callback when user clicks Start. Called with settings dict.
             on_quit: Callback when user clicks Quit.
+            on_toggle_overlay: Callback to toggle the subtitle overlay's visibility.
+
+        Note: starting/stopping transcription now lives in ConsoleWindow;
+        call `get_settings()` to read the current form values instead.
         """
         super().__init__()
 
-        self.on_start = on_start
         self.on_quit = on_quit
         self.on_toggle_overlay = on_toggle_overlay
-        self._is_running = False
         self._loading = True
 
-        # Window setup
-        self.setWindowTitle("ARIA")
+        # Window setup. Qt.WindowType.Tool keeps this out of the taskbar —
+        # ConsoleWindow (not this window) is the app's main/taskbar window.
+        self.setWindowTitle(t("settings_window_title"))
+        self.setWindowFlags(Qt.WindowType.Tool)
         self.setMinimumSize(820, 620)
         self.resize(860, 700)
         self.setStyleSheet(self._get_stylesheet())
@@ -124,9 +124,6 @@ class SettingsWindow(QMainWindow):
         self._load_saved_settings()
         self._loading = False
 
-        # Connect status signal
-        self.status_update.connect(self._update_status_label)
-
     def _center_on_screen(self):
         """Center window on screen."""
         screen = QApplication.primaryScreen()
@@ -137,51 +134,51 @@ class SettingsWindow(QMainWindow):
             self.move(x, y)
 
     def _get_stylesheet(self):
-        """Return the main stylesheet."""
+        """Return the main stylesheet: a plain, light Windows-style theme."""
         return """
             QMainWindow {
-                background-color: #1a1a1a;
+                background-color: #f3f3f3;
             }
             QLabel {
-                color: white;
+                color: #1a1a1a;
             }
             QFrame#card {
-                background-color: #2a2a2a;
-                border-radius: 12px;
+                background-color: #ffffff;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
             }
             QFrame#title_label {
                 font-size: 13px;
                 font-weight: bold;
             }
             QPushButton {
-                background-color: #3B8ED0;
+                background-color: #0078D4;
                 color: white;
                 border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
+                border-radius: 4px;
+                padding: 8px 18px;
+                font-size: 13px;
             }
             QPushButton:hover {
-                background-color: #4AA3E0;
+                background-color: #106EBE;
             }
             QPushButton:pressed {
-                background-color: #2A7DC0;
+                background-color: #005A9E;
             }
             QPushButton#secondary {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #aaaaaa;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #1a1a1a;
             }
             QPushButton#secondary:hover {
-                background-color: #333333;
+                background-color: #f0f0f0;
             }
             QComboBox {
-                background-color: #333333;
-                color: white;
-                border: 1px solid #444444;
-                border-radius: 6px;
-                padding: 8px 12px;
+                background-color: #ffffff;
+                color: #1a1a1a;
+                border: 1px solid #c0c0c0;
+                border-radius: 4px;
+                padding: 6px 10px;
                 min-width: 180px;
             }
             QComboBox::drop-down {
@@ -192,48 +189,71 @@ class SettingsWindow(QMainWindow):
                 background: transparent;
             }
             QComboBox QAbstractItemView {
-                background-color: #333333;
-                color: white;
-                selection-background-color: #3B8ED0;
+                background-color: #ffffff;
+                color: #1a1a1a;
+                selection-background-color: #0078D4;
+                selection-color: white;
+                border: 1px solid #c0c0c0;
             }
             QCheckBox {
-                color: white;
+                color: #1a1a1a;
             }
             QCheckBox::indicator {
-                width: 20px;
-                height: 20px;
-                border-radius: 4px;
-                border: 1px solid #555555;
-                background-color: #333333;
+                width: 18px;
+                height: 18px;
+                border-radius: 3px;
+                border: 1px solid #a0a0a0;
+                background-color: #ffffff;
             }
             QCheckBox::indicator:hover {
-                border-color: #3B8ED0;
-                background-color: #444444;
+                border-color: #0078D4;
             }
             QCheckBox::indicator:checked {
-                background-color: #3B8ED0;
-                border-color: #3B8ED0;
+                background-color: #0078D4;
+                border-color: #0078D4;
+                image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHBhdGggZD0iTTMgOC41TDYuNSAxMkwxMyA0IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+);
             }
             QCheckBox::indicator:checked:hover {
-                background-color: #4AA3E0;
-                border-color: #4AA3E0;
+                background-color: #106EBE;
+                border-color: #106EBE;
             }
             QComboBox:hover {
-                border-color: #3B8ED0;
+                border-color: #0078D4;
+            }
+            QTabWidget::pane {
+                border: 1px solid #d0d0d0;
+                top: -1px;
+                background: #ffffff;
+            }
+            QTabBar::tab {
+                background: #e8e8e8;
+                color: #444444;
+                padding: 8px 18px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: #ffffff;
+                color: #0078D4;
+                font-weight: bold;
+            }
+            QTabBar::tab:hover {
+                background: #f0f0f0;
             }
             QScrollBar:vertical {
                 background-color: transparent;
-                width: 8px;
+                width: 10px;
                 margin: 0;
                 border: none;
             }
             QScrollBar::handle:vertical {
-                background-color: rgba(255, 255, 255, 0.12);
-                border-radius: 4px;
+                background-color: rgba(0, 0, 0, 0.18);
+                border-radius: 5px;
                 min-height: 30px;
             }
             QScrollBar::handle:vertical:hover {
-                background-color: rgba(255, 255, 255, 0.22);
+                background-color: rgba(0, 0, 0, 0.30);
             }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
@@ -259,101 +279,41 @@ class SettingsWindow(QMainWindow):
         header.setContentsMargins(20, 20, 20, 10)
         main_layout.addWidget(header)
 
-        # === Scrollable content area ===
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.scroll_area.setStyleSheet("QScrollArea { background-color: transparent; border: none; }")
+        # === Tabbed content area ===
+        # `self.tabs` also doubles as the surface the OpenAI config overlay
+        # covers (see _show_openai_overlay/_hide_openai_overlay below).
+        self.tabs = QTabWidget()
 
-        scroll_content = QWidget()
-        scroll_content.setStyleSheet("""
-            background-color: transparent;
-            QFrame#card {
-                background-color: #2a2a2a;
-                border-radius: 12px;
-            }
-            QPushButton#secondary {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #aaaaaa;
-            }
-            QPushButton#secondary:hover {
-                background-color: #333333;
-            }
-        """)
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(20, 10, 20, 20)
-        scroll_layout.setSpacing(15)
+        self.tabs.addTab(
+            self._create_tab_page([self._create_recognition_card(), self._create_model_card()]), t("tab_recognition")
+        )
+        self.tabs.addTab(self._create_tab_page([self._create_translation_card()]), t("tab_translation"))
+        self.tabs.addTab(self._create_tab_page([self._create_reset_card()]), t("tab_general"))
 
-        # === Two-column layout ===
-        columns = QHBoxLayout()
-        columns.setSpacing(15)
-
-        # Left column
-        left_col = QVBoxLayout()
-        left_col.setSpacing(15)
-        self.recognition_card = self._create_recognition_card()
-        self.model_card = self._create_model_card()
-        left_col.addWidget(self.recognition_card, 0)
-        left_col.addWidget(self.model_card, 0)
-        left_col.setStretch(0, 0)
-        left_col.setStretch(1, 0)
-        columns.addLayout(left_col, 1)  # Equal weight
-
-        # Right column
-        right_col = QVBoxLayout()
-        right_col.setSpacing(15)
-        right_col.addWidget(self._create_translation_card())
-        right_col.addWidget(self._create_reset_card())
-        columns.addLayout(right_col, 1)  # Equal weight
-
-        scroll_layout.addLayout(columns)
-
-        # Push button to bottom
-        scroll_layout.addStretch()
-
-        # === Start Button ===
-        button_row = QHBoxLayout()
-        button_row.addStretch()
-
-        self.start_button = QPushButton("🎙 " + t("start_button"))
-        self.start_button.setMinimumHeight(45)
-        self.start_button.setMinimumWidth(150)
-        self.start_button.setStyleSheet("""
-            QPushButton {
-                background-color: #3B8ED0;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 18px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #4AA3E0;
-            }
-            QPushButton:pressed {
-                background-color: #2A7DC0;
-            }
-        """)
-        self.start_button.clicked.connect(self._on_start_click)
-        button_row.addWidget(self.start_button)
-
-        button_row.addStretch()
-        scroll_layout.addLayout(button_row)
-
-        # === Status Label (close to button) ===
-        self.status_label = QLabel(t("status_ready"))
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("color: #888888; margin-top: 5px;")
-        scroll_layout.addWidget(self.status_label)
-
-        self.scroll_area.setWidget(scroll_content)
-        main_layout.addWidget(self.scroll_area)
+        main_layout.addWidget(self.tabs)
 
         # === OpenAI config overlay (hidden by default) ===
         self._create_openai_overlay(central)
+
+    def _create_tab_page(self, cards: list) -> QScrollArea:
+        """Wrap a list of setting cards in a scrollable tab page."""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea { background-color: transparent; border: none; }")
+
+        content = QWidget()
+        content.setStyleSheet("background-color: #ffffff;")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(20, 15, 20, 20)
+        layout.setSpacing(15)
+        for card in cards:
+            layout.addWidget(card)
+        layout.addStretch()
+
+        scroll.setWidget(content)
+        return scroll
 
     def _create_header(self):
         """Create header with title and language selector."""
@@ -378,7 +338,7 @@ class SettingsWindow(QMainWindow):
         title_container.addWidget(title)
 
         subtitle = QLabel(t("subtitle"))
-        subtitle.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+        subtitle.setStyleSheet("color: #666666; font-size: 12px;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_container.addWidget(subtitle)
 
@@ -435,21 +395,21 @@ class SettingsWindow(QMainWindow):
         self.mode_asr_btn.setChecked(True)
         self.mode_asr_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #888888;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #444444;
             }
             QPushButton:hover {
-                background-color: #333333;
-                border-color: #3B8ED0;
+                background-color: #f0f0f0;
+                border-color: #0078D4;
             }
             QPushButton:checked {
-                background-color: #3B8ED0;
+                background-color: #0078D4;
                 border: none;
                 color: white;
             }
             QPushButton:checked:hover {
-                background-color: #4AA3E0;
+                background-color: #106EBE;
             }
         """)
         self.mode_asr_btn.clicked.connect(lambda: self._on_mode_change("asr"))
@@ -461,21 +421,21 @@ class SettingsWindow(QMainWindow):
         self.mode_livecaptions_btn.setCheckable(True)
         self.mode_livecaptions_btn.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #888888;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #444444;
             }
             QPushButton:hover {
-                background-color: #333333;
-                border-color: #3B8ED0;
+                background-color: #f0f0f0;
+                border-color: #0078D4;
             }
             QPushButton:checked {
-                background-color: #3B8ED0;
+                background-color: #0078D4;
                 border: none;
                 color: white;
             }
             QPushButton:checked:hover {
-                background-color: #4AA3E0;
+                background-color: #106EBE;
             }
         """)
         self.mode_livecaptions_btn.clicked.connect(lambda: self._on_mode_change("livecaptions"))
@@ -486,7 +446,7 @@ class SettingsWindow(QMainWindow):
 
         # Mode description
         self.mode_desc = QLabel(t("mode_asr_desc"))
-        self.mode_desc.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+        self.mode_desc.setStyleSheet("color: #666666; font-size: 12px;")
         self.mode_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.mode_desc)
 
@@ -562,7 +522,7 @@ class SettingsWindow(QMainWindow):
         self.trans_checkbox.stateChanged.connect(self._on_translation_change)
         trans_row.addWidget(self.trans_checkbox)
         self.trans_status = QLabel("OFF")
-        self.trans_status.setStyleSheet("color: #888888;")
+        self.trans_status.setStyleSheet("color: #666666;")
         trans_row.addWidget(self.trans_status)
         trans_row.addStretch()
         layout.addLayout(trans_row)
@@ -613,52 +573,53 @@ class SettingsWindow(QMainWindow):
         self.openai_overlay.setObjectName("openai_overlay")
         self.openai_overlay.setStyleSheet("""
             QFrame#openai_overlay {
-                background-color: #1a1a1a;
-                border-radius: 12px;
+                background-color: #ffffff;
+                border: 1px solid #d0d0d0;
+                border-radius: 8px;
             }
             QLabel {
-                color: #cccccc;
+                color: #1a1a1a;
                 font-size: 13px;
             }
             QLineEdit, QDoubleSpinBox, QSpinBox {
-                background-color: #2a2a2a;
-                color: white;
-                border: 1px solid #444444;
+                background-color: #ffffff;
+                color: #1a1a1a;
+                border: 1px solid #c0c0c0;
                 border-radius: 4px;
                 padding: 6px 10px;
             }
             QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus {
-                border-color: #3B8ED0;
+                border-color: #0078D4;
             }
             QSpinBox::up-button, QDoubleSpinBox::up-button {
                 subcontrol-origin: border;
                 subcontrol-position: top right;
                 width: 20px;
                 height: 14px;
-                background-color: #444444;
+                background-color: #e8e8e8;
                 border-radius: 3px;
                 margin: 2px 2px 0 0;
             }
             QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
-                background-color: #3B8ED0;
+                background-color: #0078D4;
             }
             QSpinBox::down-button, QDoubleSpinBox::down-button {
                 subcontrol-origin: border;
                 subcontrol-position: bottom right;
                 width: 20px;
                 height: 14px;
-                background-color: #444444;
+                background-color: #e8e8e8;
                 border-radius: 3px;
                 margin: 0 2px 2px 0;
             }
             QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-                background-color: #3B8ED0;
+                background-color: #0078D4;
             }
             QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-bottom: 6px solid white;
+                border-bottom: 6px solid #444444;
                 width: 0px;
                 height: 0px;
             }
@@ -666,7 +627,7 @@ class SettingsWindow(QMainWindow):
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 6px solid white;
+                border-top: 6px solid #444444;
                 width: 0px;
                 height: 0px;
             }
@@ -741,29 +702,29 @@ class SettingsWindow(QMainWindow):
         overlay_layout.addStretch()
 
     def _show_openai_overlay(self):
-        """Show the OpenAI config overlay, covering the scroll area."""
-        self.scroll_area.hide()
-        # Position overlay to cover the scroll area
-        self.openai_overlay.setGeometry(self.scroll_area.geometry())
+        """Show the OpenAI config overlay, covering the tab area."""
+        self.tabs.hide()
+        # Position overlay to cover the tab area
+        self.openai_overlay.setGeometry(self.tabs.geometry())
         self.openai_overlay.show()
         self.openai_overlay.raise_()
 
     def _hide_openai_overlay(self):
         """Hide the OpenAI config overlay."""
         self.openai_overlay.hide()
-        self.scroll_area.show()
+        self.tabs.show()
 
     def resizeEvent(self, event):
         """Reposition overlay when window resizes."""
         super().resizeEvent(event)
         if hasattr(self, "openai_overlay") and self.openai_overlay.isVisible():
-            self.openai_overlay.setGeometry(self.scroll_area.geometry())
+            self.openai_overlay.setGeometry(self.tabs.geometry())
 
     def showEvent(self, event):
         """Reposition overlay on first show."""
         super().showEvent(event)
         if hasattr(self, "openai_overlay") and self.openai_overlay.isVisible():
-            self.openai_overlay.setGeometry(self.scroll_area.geometry())
+            self.openai_overlay.setGeometry(self.tabs.geometry())
 
     def _create_reset_card(self):
         """Create reset settings card."""
@@ -781,15 +742,15 @@ class SettingsWindow(QMainWindow):
         self.overlay_toggle_button = QPushButton(t("overlay_hide"))
         self.overlay_toggle_button.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #aaaaaa;
-                border-radius: 8px;
-                padding: 10px 20px;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #444444;
+                border-radius: 4px;
+                padding: 8px 18px;
             }
             QPushButton:hover {
-                background-color: #333333;
-                border-color: #3B8ED0;
+                background-color: #f0f0f0;
+                border-color: #0078D4;
             }
         """)
         self.overlay_toggle_button.clicked.connect(self._on_toggle_overlay)
@@ -800,15 +761,15 @@ class SettingsWindow(QMainWindow):
         self.reset_button = QPushButton("🔄 " + t("reset_settings"))
         self.reset_button.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #aaaaaa;
-                border-radius: 8px;
-                padding: 10px 20px;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #444444;
+                border-radius: 4px;
+                padding: 8px 18px;
             }
             QPushButton:hover {
-                background-color: #333333;
-                border-color: #3B8ED0;
+                background-color: #f0f0f0;
+                border-color: #0078D4;
             }
         """)
         self.reset_button.clicked.connect(self._on_reset_settings)
@@ -817,15 +778,16 @@ class SettingsWindow(QMainWindow):
         self.quit_button = QPushButton("⏻ " + t("quit_app"))
         self.quit_button.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: 1px solid #555555;
-                color: #aaaaaa;
-                border-radius: 8px;
-                padding: 10px 20px;
+                background-color: #ffffff;
+                border: 1px solid #c0c0c0;
+                color: #444444;
+                border-radius: 4px;
+                padding: 8px 18px;
             }
             QPushButton:hover {
-                background-color: #333333;
+                background-color: #fdf0f0;
                 border-color: #E04040;
+                color: #c0392b;
             }
         """)
         self.quit_button.clicked.connect(self._on_quit_app)
@@ -834,7 +796,7 @@ class SettingsWindow(QMainWindow):
         layout.addLayout(button_row)
 
         reset_desc = QLabel(t("reset_settings_desc"))
-        reset_desc.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+        reset_desc.setStyleSheet("color: #666666; font-size: 12px;")
         reset_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(reset_desc)
 
@@ -885,7 +847,7 @@ class SettingsWindow(QMainWindow):
             self.manage_models_btn.hide()
             self.model_label.setStyleSheet("color: #555555;")
             self.model_card.setEnabled(False)
-            self.model_card.setStyleSheet("#card { background-color: rgba(42, 42, 42, 0.5); }")
+            self.model_card.setStyleSheet("#card { background-color: rgba(240, 240, 240, 0.8); }")
         self._persist_ui_settings()
 
     def _on_model_change(self, model_text: str):
@@ -896,10 +858,10 @@ class SettingsWindow(QMainWindow):
         """Handle translation checkbox change."""
         if state:
             self.trans_status.setText("ON")
-            self.trans_status.setStyleSheet("color: #3B8ED0;")
+            self.trans_status.setStyleSheet("color: #0078D4;")
         else:
             self.trans_status.setText("OFF")
-            self.trans_status.setStyleSheet("color: #888888;")
+            self.trans_status.setStyleSheet("color: #666666;")
         self._persist_ui_settings()
 
     def _on_engine_change(self, _text: str):
@@ -1005,15 +967,9 @@ class SettingsWindow(QMainWindow):
             set_language(lang_code)
             QMessageBox.information(self, t("restart_required"), t("restart_required"))
 
-    def _on_start_click(self):
-        """Handle start/stop button click."""
-        if self._is_running:
-            # Stop
-            self.on_start(None)
-        else:
-            # Start - gather settings
-            settings = self._gather_settings()
-            self.on_start(settings)
+    def get_settings(self) -> dict:
+        """Public accessor for ConsoleWindow's start button: current form values."""
+        return self._gather_settings()
 
     def _persist_ui_settings(self) -> None:
         """Persist current UI selections without starting."""
@@ -1161,50 +1117,14 @@ class SettingsWindow(QMainWindow):
         self.openai_system_prompt.setText(sm.get("openai_system_prompt", ""))
 
     # === Public API ===
-
-    def show_running(self):
-        """Update UI to show running state."""
-        self._is_running = True
-        self.start_button.setText("⏹ " + t("stop_button"))
-        self.start_button.setStyleSheet("""
-            QPushButton {
-                background-color: #E04040;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-size: 14px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #F05050;
-            }
-        """)
-        self.status_label.setText(t("status_running"))
-        self.status_label.setStyleSheet("color: #3B8ED0;")
-
-    def show_stopped(self):
-        """Update UI to show stopped state."""
-        self._is_running = False
-        self.start_button.setText("🎙 " + t("start_button"))
-        self.start_button.setStyleSheet("")  # Reset to default
-        self.status_label.setText(t("status_ready"))
-        self.status_label.setStyleSheet("color: #888888;")
-
-    def _update_status_label(self, text: str, color: str):
-        """Update status label (thread-safe via signal)."""
-        self.status_label.setText(text)
-        self.status_label.setStyleSheet(f"color: {color};")
+    # (start/stop/status display now lives in ConsoleWindow; see get_settings())
 
 
 # Quick test
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    def on_start(settings):
-        print(f"Start clicked: {settings}")
-
-    window = SettingsWindow(on_start=on_start)
+    window = SettingsWindow()
     window.show()
 
     sys.exit(app.exec())

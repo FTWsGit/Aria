@@ -28,6 +28,15 @@ except ImportError:
         print(f"[WARN] {msg}")
 
 
+try:
+    from ..segmenter import MAX_SENTENCE_LENGTH as _MAX_SENTENCE_LENGTH
+    from ..segmenter import SENTENCE_DELIMITERS as _SENTENCE_DELIMITERS
+except ImportError:
+    # Fallback for standalone testing
+    _SENTENCE_DELIMITERS = r"[.。？！?!\n，,、]"
+    _MAX_SENTENCE_LENGTH = 80
+
+
 @dataclass
 class TranslationState:
     """Represents the current translation state."""
@@ -50,10 +59,9 @@ class TranslationStateManager:
     4. When draft has enough source sentences, promote them to committed.
     """
 
-    # Sentence delimiters for segmentation
-    # Added commas (，,) and Japanese comma (、)
-    SENTENCE_DELIMITERS = r"[.。？！?!\n，,、]"
-    MAX_SENTENCE_LENGTH = 80  # Force split if sentence exceeds this
+    # Sentence delimiters for segmentation (shared with segmenter.py)
+    SENTENCE_DELIMITERS = _SENTENCE_DELIMITERS
+    MAX_SENTENCE_LENGTH = _MAX_SENTENCE_LENGTH
 
     # Buffer thresholds
     DRAFT_COMMIT_THRESHOLD = 6  # Restored to 6 as requested
@@ -87,6 +95,10 @@ class TranslationStateManager:
         self._draft_sources: list[str] = []  # Source sentences pending
         self._draft_translation: str = ""  # Translation of draft sources
         self._last_processed_text: str = ""  # Cache for duplicate detection
+
+        # Most recently committed batch, for callers that want one message
+        # per commit rather than the full running `committed_text`.
+        self._last_committed_batch: tuple[str, str] | None = None
 
     def process_text(self, full_source_text: str) -> TranslationState:
         """
@@ -255,19 +267,22 @@ class TranslationStateManager:
                 commit_target = max(1, total_draft_sources - 1)  # Leave 1 if possible
 
             to_commit = self._draft_sources[:commit_target]
+            batch_text = " ".join(to_commit)
 
             # Add to committed sources
             self._committed_sources.extend(to_commit)
 
             # Translate the newly committed batch and add as a NEW PARAGRAPH
+            batch_translation = ""
             if self.translator:
                 try:
-                    batch_text = " ".join(to_commit)
                     batch_translation = self.translator(batch_text) or ""
                     if batch_translation:
                         self._committed_paragraphs.append(batch_translation)
                 except Exception as e:
                     warning(f"TSM: Commit translation error: {e}")
+
+            self._last_committed_batch = (batch_text, batch_translation)
 
             # Remove from draft
             self._draft_sources = self._draft_sources[commit_target:]
@@ -288,6 +303,15 @@ class TranslationStateManager:
         committed_text = "\n".join(self._committed_paragraphs)
         return TranslationState(committed_text=committed_text, draft_text=self._draft_translation)
 
+    def pop_committed_batch(self) -> tuple[str, str] | None:
+        """Return and clear the most recently committed (source, translation) batch.
+
+        Returns None if nothing has committed since the last call.
+        """
+        batch = self._last_committed_batch
+        self._last_committed_batch = None
+        return batch
+
     def reset(self) -> None:
         """Reset all state."""
         self._committed_sources.clear()
@@ -295,6 +319,7 @@ class TranslationStateManager:
         self._draft_sources.clear()
         self._draft_translation = ""
         self._last_processed_text = ""
+        self._last_committed_batch = None
 
     def get_debug_info(self) -> dict:
         """Get debug information about current state."""

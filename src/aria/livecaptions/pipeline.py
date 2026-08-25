@@ -6,8 +6,9 @@ Integrates LiveCaptions monitoring, text processing, and translation
 import time
 from collections.abc import Callable
 
-from ..events import SubtitleEvent
+from ..events import SubtitleEvent, TranscriptMessage
 from ..logger import debug, error, info, warning
+from ..segmenter import PlainSentenceSegmenter
 from .controller import LiveCaptionsController
 from .manager import TranslationStateManager
 from .monitor import CaptionEvent, LiveCaptionsMonitor
@@ -50,6 +51,7 @@ class LiveCaptionsPipeline:
     def __init__(
         self,
         on_subtitle: Callable[[SubtitleEvent], None] | None = None,
+        on_message: Callable[[TranscriptMessage], None] | None = None,
         # Translation settings
         enable_translation: bool = False,
         translation_engine: str = "google",
@@ -77,6 +79,7 @@ class LiveCaptionsPipeline:
             poll_interval: Monitoring poll interval in seconds
         """
         self.on_subtitle = on_subtitle or self._default_callback
+        self._on_message = on_message
         self.enable_translation = enable_translation
         self.auto_hide_window = auto_hide_window
 
@@ -115,6 +118,13 @@ class LiveCaptionsPipeline:
             self._translation_manager = TranslationStateManager(translator=self._translator.translate)
             info("LiveCaptionsPipeline: TranslationStateManager initialized")
 
+        # Console history: reuse the same commit-batch signal as the
+        # translation manager, or a plain segmenter when translation is off.
+        self._msg_seq = 0
+        self._plain_segmenter = None
+        if not self._translation_manager:
+            self._plain_segmenter = PlainSentenceSegmenter()
+
         trans_status = "enabled" if self._translator else "disabled"
         info(f"LiveCaptionsPipeline: Initialized, translation={trans_status}")
 
@@ -150,6 +160,9 @@ class LiveCaptionsPipeline:
                     state = self._translation_manager.process_text(caption.text)
                     committed_translation = state.committed_text
                     draft_translation = state.draft_text
+                    batch = self._translation_manager.pop_committed_batch()
+                    if batch:
+                        self._emit_message(batch[0], batch[1])
                 except Exception as e:
                     warning(f"LiveCaptionsPipeline: Translation manager failed: {e}")
             elif self._translator:
@@ -158,6 +171,11 @@ class LiveCaptionsPipeline:
                     translated_text = self._translator.translate(caption.text)
                 except Exception as e:
                     warning(f"LiveCaptionsPipeline: Translation failed: {e}")
+            elif self._plain_segmenter:
+                # No translation at all: still batch sentences for console history.
+                committed = self._plain_segmenter.process_text(caption.text)
+                if committed:
+                    self._emit_message(committed, None)
 
             # Create subtitle event with dual-buffer translation fields
             event = SubtitleEvent(
@@ -200,6 +218,9 @@ class LiveCaptionsPipeline:
         # Start monitor
         self._monitor.start()
         self._running = True
+        self._msg_seq = 0
+        if self._plain_segmenter:
+            self._plain_segmenter.reset()
 
         # Hide window AFTER monitor has found the element
         # Wait a bit for monitor to initialize
@@ -233,6 +254,20 @@ class LiveCaptionsPipeline:
         print(f"[{event.language}] {event.text}")
         if event.translated_text:
             print(f"[Translation] {event.translated_text}")
+
+    def _emit_message(self, original: str, translation: str | None) -> None:
+        """Emit one finalized console-history line."""
+        if not self._on_message or not original:
+            return
+        self._msg_seq += 1
+        self._on_message(
+            TranscriptMessage(
+                msg_id=self._msg_seq,
+                timestamp=time.time(),
+                original=original,
+                translation=translation,
+            )
+        )
 
 
 # Simple test

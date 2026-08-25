@@ -13,14 +13,15 @@ from collections.abc import Callable
 import numpy as np
 
 from .audio.capture import AudioCapture
-from .events import SubtitleEvent
+from .events import SubtitleEvent, TranscriptMessage
 from .logger import debug, exception, info, transcript, warning
 
 # Import ASR backends and model registry
 from .model_manager.manager import ModelManager
 from .model_manager.registry import ModelRegistry
+from .segmenter import PlainSentenceSegmenter
 from .transcription.base import ChunkedASR, StreamingASR
-from .transcription.sherpa_onnx import SherpaOnnxStreamingBackend, SherpaOnnxChunkedBackend
+from .transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
 
 # Translation support (optional)
 try:
@@ -64,6 +65,7 @@ class StreamingPipeline:
         model_manager: ModelManager,
         on_subtitle: Callable[[SubtitleEvent], None] | None = None,
         on_error: Callable[[str], None] | None = None,
+        on_message: Callable[[TranscriptMessage], None] | None = None,
         max_lines: int = 4,
         # Translation settings
         enable_translation: bool = False,
@@ -94,6 +96,7 @@ class StreamingPipeline:
         """
         self.on_subtitle = on_subtitle or self._default_callback
         self._on_error = on_error
+        self._on_message = on_message
         self.max_lines = max_lines
         self.enable_translation = enable_translation
         self.translation_engine = translation_engine
@@ -159,6 +162,15 @@ class StreamingPipeline:
         self._text_lock = threading.Lock()
         self._translation_thread: threading.Thread | None = None
 
+        # Discrete message history (console view). When translation is off,
+        # `_plain_segmenter` derives the same kind of commit batches directly
+        # from the raw ASR text so the console still gets one line per group
+        # of sentences instead of nothing.
+        self._msg_seq: int = 0
+        self._plain_segmenter: PlainSentenceSegmenter | None = None
+        if not self._state_manager:
+            self._plain_segmenter = PlainSentenceSegmenter()
+
         # Failure tracking
         self._consecutive_asr_failures: int = 0
         self._consecutive_translation_failures: int = 0
@@ -170,6 +182,20 @@ class StreamingPipeline:
     def _default_callback(self, event: SubtitleEvent) -> None:
         """Default subtitle callback."""
         debug(f"[{event.language}] {event.text}")
+
+    def _emit_message(self, original: str, translation: str | None) -> None:
+        """Emit one finalized console-history line."""
+        if not self._on_message or not original:
+            return
+        self._msg_seq += 1
+        self._on_message(
+            TranscriptMessage(
+                msg_id=self._msg_seq,
+                timestamp=time.time(),
+                original=original,
+                translation=translation,
+            )
+        )
 
     def _on_audio(self, audio: np.ndarray, sample_rate: int) -> None:
         """Callback from AudioCapture."""
@@ -245,6 +271,11 @@ class StreamingPipeline:
                 )
                 self.on_subtitle(event)
 
+                if self._plain_segmenter:
+                    committed = self._plain_segmenter.process_text(raw_text)
+                    if committed:
+                        self._emit_message(committed, None)
+
     def _translation_loop(self) -> None:
         """
         Translation Thread: Low-speed translation processing.
@@ -283,6 +314,10 @@ class StreamingPipeline:
                 )
                 self.on_subtitle(event)
 
+                batch = self._state_manager.pop_committed_batch()
+                if batch:
+                    self._emit_message(batch[0], batch[1])
+
                 # Reset failure counter on success
                 self._consecutive_translation_failures = 0
                 _translation_error_reported = False
@@ -313,6 +348,9 @@ class StreamingPipeline:
 
         if self._state_manager:
             self._state_manager.reset()
+        if self._plain_segmenter:
+            self._plain_segmenter.reset()
+        self._msg_seq = 0
 
         # Start threads
         self._process_thread = threading.Thread(target=self._process_loop, daemon=True, name="StreamingPipeline_ASR")

@@ -12,7 +12,7 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
-from ..events import SubtitleEvent
+from ..events import SubtitleEvent, TranscriptMessage
 from ..i18n import t
 from ..livecaptions.pipeline import LiveCaptionsPipeline
 from ..logger import exception, set_console_mode, start_simple_log_session
@@ -21,6 +21,7 @@ from ..model_manager.registry import ModelRegistry
 from ..pipeline import StreamingPipeline
 from ..settings_manager import get_settings_manager
 from ..timezone_utils import set_app_timezone_name
+from .console_window import ConsoleWindow
 from .settings_window import SettingsWindow
 from .subtitle_overlay import SubtitleOverlay
 from .system_tray import SystemTray
@@ -30,6 +31,7 @@ class PipelineSignals(QObject):
     """Signals for thread-safe communication from pipeline to UI."""
 
     subtitle = pyqtSignal(object)  # SubtitleEvent
+    message = pyqtSignal(object)  # TranscriptMessage
     started = pyqtSignal()
     error = pyqtSignal(str)
 
@@ -43,8 +45,8 @@ class App:
     def __init__(self):
         """Initialize the application."""
         self._settings_window: SettingsWindow | None = None
+        self._console: ConsoleWindow | None = None
         self._overlay: SubtitleOverlay | None = None
-        self._translation_overlay: SubtitleOverlay | None = None
         self._pipeline: StreamingPipeline | LiveCaptionsPipeline | None = None
         self._tray: SystemTray | None = None
         self._is_running = False
@@ -60,6 +62,7 @@ class App:
         # Pipeline signals for thread-safe updates
         self._signals = PipelineSignals()
         self._signals.subtitle.connect(self._on_subtitle)
+        self._signals.message.connect(self._on_message)
         self._signals.started.connect(self._on_pipeline_started)
         self._signals.error.connect(self._on_error)
 
@@ -69,22 +72,46 @@ class App:
         self._app = QApplication(sys.argv)
         self._app.setApplicationName("ARIA")
         self._app.setFont(QFont("Segoe UI", 9))
+        # Closing an auxiliary window (settings) must never quit the app;
+        # only the console's Quit button / tray Quit should do that.
+        self._app.setQuitOnLastWindowClosed(False)
 
-        # Create settings window
+        # Create settings window (hidden until opened from the console)
         sm = get_settings_manager()
         self._overlay_visible = sm.get("overlay_visible", True)
         set_console_mode(sm.get("console_mode", "verbose"))
         set_app_timezone_name(sm.get("timezone", "system"))
 
         self._settings_window = SettingsWindow(
-            on_start=self._on_start,
             on_quit=self._cleanup_and_quit,
             on_toggle_overlay=self._toggle_overlay_visibility,
         )
-        self._settings_window.show()
 
-        # Handle window close
-        self._settings_window.closeEvent = self._on_window_close
+        # Create console window: the app's primary, always-visible window.
+        self._console = ConsoleWindow()
+        self._console.start_clicked.connect(self._on_console_start)
+        self._console.stop_clicked.connect(self._stop)
+        self._console.settings_clicked.connect(self._on_show_settings)
+        self._console.quit_clicked.connect(self._cleanup_and_quit)
+        self._console.topmost_toggled.connect(self._on_console_topmost_toggled)
+        self._console.auto_scroll_toggled.connect(self._on_console_auto_scroll_toggled)
+        self._console.geometry_changed.connect(self._on_console_geometry_changed)
+        self._console.closed.connect(self._on_console_closed)
+
+        self._console.restore_preferences(
+            topmost=sm.get("console_topmost", True),
+            auto_scroll=sm.get("console_auto_scroll", True),
+        )
+        x, y, w, h = (
+            sm.get("console_x", -1),
+            sm.get("console_y", -1),
+            sm.get("console_w", -1),
+            sm.get("console_h", -1),
+        )
+        if x >= 0 and y >= 0:
+            self._console.restore_geometry(x, y, w, h)
+
+        self._console.show()
 
         # Create and start system tray
         self._tray = SystemTray(on_show=self._on_tray_show, on_toggle=self._on_tray_toggle, on_quit=self._on_tray_quit)
@@ -100,18 +127,42 @@ class App:
         # Start the Qt event loop
         sys.exit(self._app.exec())
 
-    def _on_window_close(self, event) -> None:
-        """Handle window close - minimize to tray."""
-        event.ignore()
-        self._settings_window.hide()
-
+    def _on_console_closed(self) -> None:
+        """Console window was closed - minimize to tray."""
         if self._tray:
             self._tray.show_notification(t("tray_minimized_title"), t("tray_minimized_msg"))
 
-    def _on_tray_show(self) -> None:
-        """Handle tray 'show' click."""
+    def _on_show_settings(self) -> None:
+        """Open (or raise) the settings window from the console's Settings button."""
         self._settings_window.show()
         self._settings_window.activateWindow()
+
+    def _on_console_start(self) -> None:
+        """Console's start button: gather settings and start the pipeline."""
+        self._on_start(self._settings_window.get_settings())
+
+    def _on_console_topmost_toggled(self, checked: bool) -> None:
+        sm = get_settings_manager()
+        sm.set("console_topmost", checked)
+        sm.save()
+
+    def _on_console_auto_scroll_toggled(self, checked: bool) -> None:
+        sm = get_settings_manager()
+        sm.set("console_auto_scroll", checked)
+        sm.save()
+
+    def _on_console_geometry_changed(self, x: int, y: int, w: int, h: int) -> None:
+        sm = get_settings_manager()
+        sm.set("console_x", x)
+        sm.set("console_y", y)
+        sm.set("console_w", w)
+        sm.set("console_h", h)
+        sm.save()
+
+    def _on_tray_show(self) -> None:
+        """Handle tray 'show' click."""
+        self._console.show()
+        self._console.activateWindow()
 
     def _on_tray_toggle(self) -> None:
         """Handle tray 'toggle' click."""
@@ -160,42 +211,14 @@ class App:
         if not self._check_all_required_models(settings):
             return
 
-        # Create overlays based on mode
-        if self._is_livecaptions_mode:
-            # LiveCaptions mode: only create translation overlay if needed
-            # (original subtitles shown by Windows LiveCaptions)
-            if self._enable_translation:
-                if self._translation_overlay is None:
-                    self._translation_overlay = SubtitleOverlay(position_key="translation_overlay", on_close=self._stop)
-                    self._translation_overlay.set_translation_mode(True)
-                    self._translation_overlay.set_multiline_mode(True)
-            elif self._translation_overlay is not None:
-                self._translation_overlay.close()
-                self._translation_overlay = None
-        else:
-            # Other modes: create both original and translation overlays
-            if self._overlay is None:
-                self._overlay = SubtitleOverlay(on_close=self._stop)
+        # Create the merged overlay (original + translation, one window)
+        if self._overlay is None:
+            self._overlay = SubtitleOverlay(on_close=self._stop)
+        self._overlay.set_multiline_mode(True)
 
-            # Create translation overlay if enabled
-            if self._enable_translation and self._translation_overlay is None:
-                self._translation_overlay = SubtitleOverlay(position_key="translation_overlay", on_close=self._stop)
-                self._translation_overlay.set_translation_mode(True)
-            elif not self._enable_translation and self._translation_overlay is not None:
-                self._translation_overlay.close()
-                self._translation_overlay = None
-
-            # Set overlay mode (asr)
-            self._overlay.set_multiline_mode(True)
-            if self._translation_overlay:
-                self._translation_overlay.set_multiline_mode(True)
-
-        # Apply hidden state immediately so start won't pop overlays when disabled.
+        # Apply hidden state immediately so start won't pop the overlay when disabled.
         if not self._overlay_visible:
-            if self._overlay:
-                self._overlay.hide()
-            if self._translation_overlay:
-                self._translation_overlay.hide()
+            self._overlay.hide()
 
         # Defensive: clean up any leftover pipeline from a previous error path
         self._stop_pipeline()
@@ -207,6 +230,7 @@ class App:
                     # Use Windows LiveCaptions
                     self._pipeline = LiveCaptionsPipeline(
                         on_subtitle=lambda e: self._signals.subtitle.emit(e),
+                        on_message=lambda m: self._signals.message.emit(m),
                         enable_translation=self._enable_translation,
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
@@ -227,6 +251,7 @@ class App:
                         model_manager=self._model_manager,
                         on_subtitle=lambda e: self._signals.subtitle.emit(e),
                         on_error=lambda msg: self._signals.error.emit(msg),
+                        on_message=lambda m: self._signals.message.emit(m),
                         enable_translation=self._enable_translation,
                         translation_engine=settings.get("translation_engine", "google"),
                         target_language=settings.get("target_language", "zho_Hant"),
@@ -250,38 +275,33 @@ class App:
         threading.Thread(target=create_pipeline, daemon=True).start()
 
         # Show loading state
-        self._settings_window.status_label.setText(t("status_loading_model"))
-        self._settings_window.status_label.setStyleSheet("color: #888888;")
+        self._console.set_status(t("status_loading_model"))
 
     def _on_pipeline_started(self) -> None:
         """Called when pipeline has started."""
         self._is_running = True
-        self._settings_window.show_running()
+        self._console.set_running(True)
+        self._console.set_status(t("status_running"))
 
         # Show overlays based on mode
         if not self._overlay_visible:
             if self._overlay:
                 self._overlay.hide()
-            if self._translation_overlay:
-                self._translation_overlay.hide()
             if self._tray:
                 self._tray.update_status(True)
             return
 
-        if self._is_livecaptions_mode:
-            # LiveCaptions mode: only show translation overlay
-            if self._translation_overlay:
-                self._translation_overlay.show()
-                self._translation_overlay.update_subtitle(t("overlay_translation_waiting"), "")
-        else:
-            # Other modes: show original subtitle overlay
-            if self._overlay:
-                self._overlay.show()
+        if self._overlay:
+            self._overlay.show()
+            if self._enable_translation:
+                self._overlay.update_subtitle(
+                    t("overlay_waiting"),
+                    "",
+                    committed_translation=t("overlay_translation_waiting"),
+                    draft_translation="",
+                )
+            else:
                 self._overlay.update_subtitle(t("overlay_waiting"), "")
-
-            if self._translation_overlay:
-                self._translation_overlay.show()
-                self._translation_overlay.update_subtitle(t("overlay_translation_waiting"), "")
 
         # Update tray
         if self._tray:
@@ -291,51 +311,31 @@ class App:
         """Handle subtitle events from pipeline."""
         if not self._is_running:
             return
-        if not self._overlay_visible:
+        if not self._overlay_visible or not self._overlay:
             return
 
-        # For LiveCaptions mode, only update translation overlay
-        if self._is_livecaptions_mode:
-            # Windows LiveCaptions shows the original text
-            # We only need to handle translation
-            if self._translation_overlay:
-                # 使用新的雙緩衝字段
-                if (
-                    getattr(event, "committed_translation", None) is not None
-                    or getattr(event, "draft_translation", None) is not None
-                ):
-                    self._translation_overlay.update_subtitle(
-                        "",
-                        "",
-                        None,
-                        committed_translation=event.committed_translation,
-                        draft_translation=event.draft_translation,
-                    )
-                elif event.translated_text:
-                    # 向後兼容舊格式
-                    self._translation_overlay.update_subtitle("", "", translated_text=event.translated_text)
-            return
-
-        text = event.text
-        language = event.language
-        display_text = text
-
-        # Update overlay
-        if self._overlay:
-            self._overlay.update_subtitle(display_text, language)
-
-        # Update translation overlay
-        if self._translation_overlay and (
+        # Windows LiveCaptions and Sherpa ASR both feed the same merged
+        # overlay now: original text (dimmed) + translation (prominent).
+        if (
             getattr(event, "committed_translation", None) is not None
             or getattr(event, "draft_translation", None) is not None
         ):
-            self._translation_overlay.update_subtitle(
-                "",
-                "",
-                None,
+            self._overlay.update_subtitle(
+                event.text,
+                event.language,
                 committed_translation=event.committed_translation,
                 draft_translation=event.draft_translation,
             )
+        elif event.translated_text:
+            self._overlay.update_subtitle(event.text, event.language, translated_text=event.translated_text)
+        else:
+            self._overlay.update_subtitle(event.text, event.language)
+
+    def _on_message(self, msg: TranscriptMessage) -> None:
+        """Handle a finalized transcript line from the pipeline."""
+        if not self._is_running or not self._console:
+            return
+        self._console.add_message(msg)
 
     def _stop_pipeline(self) -> None:
         """Stop and release the pipeline instance."""
@@ -347,10 +347,9 @@ class App:
         """Handle pipeline error."""
         self._is_running = False
         self._stop_pipeline()
-        self._settings_window.show_stopped()
+        self._console.set_running(False)
         display_msg = t(error)
-        self._settings_window.status_label.setText(display_msg)
-        self._settings_window.status_label.setStyleSheet("color: red;")
+        self._console.set_status(display_msg)
 
         if self._tray:
             self._tray.update_status(False)
@@ -364,10 +363,8 @@ class App:
         if self._overlay:
             self._overlay.hide()
 
-        if self._translation_overlay:
-            self._translation_overlay.hide()
-
-        self._settings_window.show_stopped()
+        self._console.set_running(False)
+        self._console.set_status(t("status_ready"))
 
         if self._tray:
             self._tray.update_status(False)
@@ -413,16 +410,10 @@ class App:
         sm.save()
 
         if self._overlay:
-            if self._overlay_visible and self._is_running and not self._is_livecaptions_mode:
+            if self._overlay_visible and self._is_running:
                 self._overlay.show()
             else:
                 self._overlay.hide()
-
-        if self._translation_overlay:
-            if self._overlay_visible and self._is_running:
-                self._translation_overlay.show()
-            else:
-                self._translation_overlay.hide()
 
         return self._overlay_visible
 

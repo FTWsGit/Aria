@@ -93,7 +93,7 @@ class SherpaOnnxChunkedBackend:
         factory = getattr(sherpa_onnx.OfflineRecognizer, factory_name)
         kwargs = _build_sherpa_kwargs(spec, model_root)
         self._recognizer = factory(**kwargs)
-        
+
         info("SherpaOnnxChunkedBackend: Initialized")
 
     def transcribe(self, audio: np.ndarray, sample_rate: int) -> str:

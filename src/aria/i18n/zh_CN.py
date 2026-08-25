@@ -114,7 +114,7 @@ TRANSLATIONS = {
     "model_required_download_title": "模型未下载",
     "model_required_download_msg": "模型 '{model_id}' 尚未下载。\n请先在模型管理中下载。",
     # Tray menu
-    "tray_show_settings": "显示设置",
+    "tray_show_settings": "显示主窗口",
     "tray_toggle_subtitles": "开始/停止 字幕",
     "tray_quit": "退出",
     # Audio source
@@ -135,4 +135,16 @@ TRANSLATIONS = {
     "close": "关闭",
     "configure": "配置",
     "back": "返回",
+    # Console window
+    "console_title": "ARIA 控制台",
+    "btn_clear": "清屏",
+    "btn_settings": "设置",
+    "btn_quit": "退出",
+    "chk_topmost": "始终置顶",
+    "chk_auto_scroll": "自动滚动",
+    # Settings window tabs
+    "tab_recognition": "识别",
+    "tab_translation": "翻译",
+    "tab_general": "通用",
+    "settings_window_title": "ARIA 设置",
 }
