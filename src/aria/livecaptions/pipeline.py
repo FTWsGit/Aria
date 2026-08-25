@@ -8,19 +8,9 @@ from collections.abc import Callable
 
 from ..events import SubtitleEvent, TranscriptMessage
 from ..logger import debug, error, info, warning
-from ..segmenter import PlainSentenceSegmenter
-from ..translation.state_manager import TranslationStateManager
+from ..translation.translation_layer import TranslationLayer
 from .controller import LiveCaptionsController
 from .monitor import CaptionEvent, LiveCaptionsMonitor
-
-# Translation support (optional)
-try:
-    from ..translation.translator import create_translator
-
-    TRANSLATION_AVAILABLE = True
-except ImportError:
-    TRANSLATION_AVAILABLE = False
-    create_translator = None
 
 
 class LiveCaptionsPipeline:
@@ -90,42 +80,25 @@ class LiveCaptionsPipeline:
         # Create monitor
         self._monitor = LiveCaptionsMonitor(on_caption=self._on_caption, poll_interval=poll_interval)
 
-        # Translator
-        self._translator = None
-        if enable_translation and TRANSLATION_AVAILABLE:
-            try:
-                self._translator = create_translator(
-                    engine=translation_engine,
-                    target_language=target_language,
-                    openai_endpoint=openai_endpoint,
-                    openai_api_key=openai_api_key,
-                    openai_model_name=openai_model_name,
-                    openai_temperature=openai_temperature,
-                    openai_max_tokens=openai_max_tokens,
-                    openai_system_prompt=openai_system_prompt,
-                )
-                info(f"LiveCaptionsPipeline: Translator initialized ({translation_engine})")
-            except Exception as e:
-                warning(f"LiveCaptionsPipeline: Translation init failed: {e}")
+        # Translation layer (handles translator, state manager, segmenter)
+        self._translation_layer = TranslationLayer(
+            enable_translation=enable_translation,
+            translation_engine=translation_engine,
+            target_language=target_language,
+            openai_endpoint=openai_endpoint,
+            openai_api_key=openai_api_key,
+            openai_model_name=openai_model_name,
+            openai_temperature=openai_temperature,
+            openai_max_tokens=openai_max_tokens,
+            openai_system_prompt=openai_system_prompt,
+            on_message=on_message,
+        )
 
         # State
         self._running = False
         self._last_sent_text = ""
 
-        # Translation state manager for incremental translation
-        self._translation_manager = None
-        if self._translator:
-            self._translation_manager = TranslationStateManager(translator=self._translator.translate)
-            info("LiveCaptionsPipeline: TranslationStateManager initialized")
-
-        # Console history: reuse the same commit-batch signal as the
-        # translation manager, or a plain segmenter when translation is off.
-        self._msg_seq = 0
-        self._plain_segmenter = None
-        if not self._translation_manager:
-            self._plain_segmenter = PlainSentenceSegmenter()
-
-        trans_status = "enabled" if self._translator else "disabled"
+        trans_status = "enabled" if self._translation_layer.is_active else "disabled"
         info(f"LiveCaptionsPipeline: Initialized, translation={trans_status}")
 
     def _on_caption(self, caption: CaptionEvent):
@@ -150,32 +123,13 @@ class LiveCaptionsPipeline:
                 debug("LiveCaptionsPipeline: Duplicate text, skipping")
                 return
 
-            # Use translation manager for incremental translation
-            committed_translation = None
-            draft_translation = None
+            # Use translation layer for translation + segmenter fallback
+            result = self._translation_layer.process_text(caption.text)
+            committed_translation = result.committed_text
+            draft_translation = result.draft_text
             translated_text = None
-
-            if self._translation_manager:
-                try:
-                    state = self._translation_manager.process_text(caption.text)
-                    committed_translation = state.committed_text
-                    draft_translation = state.draft_text
-                    batch = self._translation_manager.pop_committed_batch()
-                    if batch:
-                        self._emit_message(batch[0], batch[1])
-                except Exception as e:
-                    warning(f"LiveCaptionsPipeline: Translation manager failed: {e}")
-            elif self._translator:
-                # Fallback: direct translation without state management
-                try:
-                    translated_text = self._translator.translate(caption.text)
-                except Exception as e:
-                    warning(f"LiveCaptionsPipeline: Translation failed: {e}")
-            elif self._plain_segmenter:
-                # No translation at all: still batch sentences for console history.
-                committed = self._plain_segmenter.process_text(caption.text)
-                if committed:
-                    self._emit_message(committed, None)
+            if result.batch:
+                self._translation_layer.emit_message(result.batch[0], result.batch[1])
 
             # Create subtitle event with dual-buffer translation fields
             event = SubtitleEvent(
@@ -185,7 +139,7 @@ class LiveCaptionsPipeline:
                 timestamp=caption.timestamp,
                 is_partial=not caption.is_final,
                 translated_text=translated_text,
-                target_language=self._translator.target_language if self._translator else None,
+                target_language=self._translation_layer.target_language,
                 committed_translation=committed_translation,
                 draft_translation=draft_translation,
             )
@@ -218,9 +172,7 @@ class LiveCaptionsPipeline:
         # Start monitor
         self._monitor.start()
         self._running = True
-        self._msg_seq = 0
-        if self._plain_segmenter:
-            self._plain_segmenter.reset()
+        self._translation_layer.reset()
 
         # Hide window AFTER monitor has found the element
         # Wait a bit for monitor to initialize
@@ -255,22 +207,7 @@ class LiveCaptionsPipeline:
         if event.translated_text:
             print(f"[Translation] {event.translated_text}")
 
-    def _emit_message(self, original: str, translation: str | None) -> None:
-        """Emit one finalized console-history line."""
-        if not self._on_message or not original:
-            return
-        self._msg_seq += 1
-        self._on_message(
-            TranscriptMessage(
-                msg_id=self._msg_seq,
-                timestamp=time.time(),
-                original=original,
-                translation=translation,
-            )
-        )
-
-
-# Simple test
+    # Simple test
 if __name__ == "__main__":
     print("Testing LiveCaptionsPipeline...")
     print("Please make sure you have audio playing")

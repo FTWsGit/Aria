@@ -14,28 +14,14 @@ import numpy as np
 
 from .audio.capture import AudioCapture
 from .events import SubtitleEvent, TranscriptMessage
-from .logger import debug, exception, info, transcript, warning
+from .logger import debug, exception, info, transcript
 
 # Import ASR backends and model registry
 from .model_manager.manager import ModelManager
 from .model_manager.registry import ModelRegistry
-from .segmenter import PlainSentenceSegmenter
 from .transcription.base import ChunkedASR, StreamingASR
 from .transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
-
-# Translation support (optional)
-try:
-    from .translation.translator import create_translator
-
-    TRANSLATION_AVAILABLE = True
-    debug("Translation module loaded")
-except ImportError as e:
-    warning(f"Translation import failed: {e}")
-    TRANSLATION_AVAILABLE = False
-    create_translator = None
-
-# TranslationStateManager for incremental translation
-from .translation.state_manager import TranslationStateManager
+from .translation.translation_layer import TranslationLayer
 
 STREAMING_BACKENDS = {
     "sherpa_onnx": SherpaOnnxStreamingBackend,
@@ -122,27 +108,19 @@ class StreamingPipeline:
         else:
             raise ValueError(f"Unsupported ASR kind: {spec.kind}")
 
-        # Translation (optional)
-        self._translator = None
-        self._state_manager = None
-        if enable_translation and TRANSLATION_AVAILABLE:
-            try:
-                self._translator = create_translator(
-                    engine=translation_engine,
-                    target_language=target_language,
-                    openai_endpoint=openai_endpoint,
-                    openai_api_key=openai_api_key,
-                    openai_model_name=openai_model_name,
-                    openai_temperature=openai_temperature,
-                    openai_max_tokens=openai_max_tokens,
-                    openai_system_prompt=openai_system_prompt,
-                )
-                self._state_manager = TranslationStateManager(translator=self._translator.translate)
-                debug("StreamingPipeline: TranslationStateManager initialized")
-            except Exception as e:
-                warning(f"Translation init failed: {e}")
-                self._translator = None
-                self._state_manager = None
+        # Translation layer (handles translator, state manager, segmenter)
+        self._translation_layer = TranslationLayer(
+            enable_translation=enable_translation,
+            translation_engine=translation_engine,
+            target_language=target_language,
+            openai_endpoint=openai_endpoint,
+            openai_api_key=openai_api_key,
+            openai_model_name=openai_model_name,
+            openai_temperature=openai_temperature,
+            openai_max_tokens=openai_max_tokens,
+            openai_system_prompt=openai_system_prompt,
+            on_message=on_message,
+        )
 
         # Audio capture
         self._audio_capture = AudioCapture(source=audio_source)
@@ -162,40 +140,19 @@ class StreamingPipeline:
         self._text_lock = threading.Lock()
         self._translation_thread: threading.Thread | None = None
 
-        # Discrete message history (console view). When translation is off,
-        # `_plain_segmenter` derives the same kind of commit batches directly
-        # from the raw ASR text so the console still gets one line per group
-        # of sentences instead of nothing.
-        self._msg_seq: int = 0
-        self._plain_segmenter: PlainSentenceSegmenter | None = None
-        if not self._state_manager:
-            self._plain_segmenter = PlainSentenceSegmenter()
+        # Message sequence counter is managed by TranslationLayer
 
         # Failure tracking
         self._consecutive_asr_failures: int = 0
         self._consecutive_translation_failures: int = 0
         self._asr_fatal: bool = False
 
-        trans_status = "enabled (incremental)" if self._state_manager else "disabled"
+        trans_status = "enabled (incremental)" if self._translation_layer.is_active else "disabled"
         info(f"StreamingPipeline: mode={self._mode}, backend={spec.backend}, translation={trans_status}")
 
     def _default_callback(self, event: SubtitleEvent) -> None:
         """Default subtitle callback."""
         debug(f"[{event.language}] {event.text}")
-
-    def _emit_message(self, original: str, translation: str | None) -> None:
-        """Emit one finalized console-history line."""
-        if not self._on_message or not original:
-            return
-        self._msg_seq += 1
-        self._on_message(
-            TranscriptMessage(
-                msg_id=self._msg_seq,
-                timestamp=time.time(),
-                original=original,
-                translation=translation,
-            )
-        )
 
     def _on_audio(self, audio: np.ndarray, sample_rate: int) -> None:
         """Callback from AudioCapture."""
@@ -258,7 +215,7 @@ class StreamingPipeline:
             transcript(raw_text)
 
             # If no translation, emit immediately
-            if not self._state_manager:
+            if not self._translation_layer.is_active:
                 event = SubtitleEvent(
                     text=raw_text,
                     language="",
@@ -271,10 +228,9 @@ class StreamingPipeline:
                 )
                 self.on_subtitle(event)
 
-                if self._plain_segmenter:
-                    committed = self._plain_segmenter.process_text(raw_text)
-                    if committed:
-                        self._emit_message(committed, None)
+                result = self._translation_layer.process_text(raw_text)
+                if result.batch:
+                    self._translation_layer.emit_message(result.batch[0], result.batch[1])
 
     def _translation_loop(self) -> None:
         """
@@ -292,15 +248,15 @@ class StreamingPipeline:
                 raw_text = self._latest_raw_text
                 self._new_text_event.clear()
 
-            if not raw_text or not self._state_manager:
+            if not raw_text or not self._translation_layer.is_active:
                 continue
 
             try:
-                state = self._state_manager.process_text(raw_text)
-                if state.committed_text:
-                    transcript(state.committed_text)
-                if state.draft_text:
-                    transcript(state.draft_text)
+                result = self._translation_layer.process_text(raw_text)
+                if result.committed_text:
+                    transcript(result.committed_text)
+                if result.draft_text:
+                    transcript(result.draft_text)
 
                 event = SubtitleEvent(
                     text=raw_text,
@@ -308,15 +264,14 @@ class StreamingPipeline:
                     confidence=1.0,
                     timestamp=time.time(),
                     is_partial=True,
-                    committed_translation=state.committed_text,
-                    draft_translation=state.draft_text,
-                    target_language=self.target_language,
+                    committed_translation=result.committed_text,
+                    draft_translation=result.draft_text,
+                    target_language=self._translation_layer.target_language,
                 )
                 self.on_subtitle(event)
 
-                batch = self._state_manager.pop_committed_batch()
-                if batch:
-                    self._emit_message(batch[0], batch[1])
+                if result.batch:
+                    self._translation_layer.emit_message(result.batch[0], result.batch[1])
 
                 # Reset failure counter on success
                 self._consecutive_translation_failures = 0
@@ -346,17 +301,13 @@ class StreamingPipeline:
         self._latest_raw_text = ""
         self._new_text_event.clear()
 
-        if self._state_manager:
-            self._state_manager.reset()
-        if self._plain_segmenter:
-            self._plain_segmenter.reset()
-        self._msg_seq = 0
+        self._translation_layer.reset()
 
         # Start threads
         self._process_thread = threading.Thread(target=self._process_loop, daemon=True, name="StreamingPipeline_ASR")
         self._process_thread.start()
 
-        if self._state_manager:
+        if self._translation_layer.is_active:
             self._translation_thread = threading.Thread(
                 target=self._translation_loop, daemon=True, name="StreamingPipeline_Translation"
             )
