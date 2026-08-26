@@ -11,6 +11,17 @@ alwaysApply: false
 
 通过 UI Automation 读取 Windows 11 内建 Live Captions 窗口的文本，作为 ASR 输入。
 
+## 为什么独立成顶层包，而不是 `transcription/` 下的一个 backend
+
+`transcription/` 里的 backend 只做「PCM → 文本」，输入靠 `audio/` 捕获。
+`livecaptions/` 不需要 `audio/`，也不需要 `transcription/`：Windows 自己完成了
+捕获和识别，我们只是用 UI Automation 把已经转出来的文字读出来。所以它其实是
+`audio/` + `transcription/` 两层职责的替代品，而不是 `transcription/` 内部多一个
+backend —— 这也是它需要 `controller.py`（启动/摆放窗口，对应 `audio/` 的采集职责）
+和 `monitor.py`（读取文本，对应 ASR 的输出）两个文件、体量和 `transcription/`
+或 `translation/` 相当的原因。放在根目录下与 `audio/`、`transcription/`、
+`translation/` 平级是合理的，不是历史遗留。
+
 ## 组件
 
 | 文件 | 职责 |
@@ -18,7 +29,10 @@ alwaysApply: false
 | `pipeline.py` | `LiveCaptionsPipeline`：启动、监控、去重、翻译 |
 | `monitor.py` | `LiveCaptionsMonitor`：轮询 Windows LiveCaptions 窗口文本 |
 | `controller.py` | `LiveCaptionsController`：启动（Win+Ctrl+L）、最小化、隐藏、检测 |
-| `manager.py` | `TranslationStateManager`：翻译状态机（已移至 `translation/state_manager.py`），被 `pipeline.py` 和 `livecaptions/pipeline.py` 共同 import |
+
+`LiveCaptionsPipeline` 继承根目录 `../pipeline.py` 里的 `BasePipeline`，翻译层通过
+`BasePipeline._make_translation_layer()` 构建 —— 与 `StreamingPipeline` 共用同一份
+`TranslationLayer` 组装逻辑，避免两边各写一份几乎相同的初始化代码。
 
 ## 依赖
 

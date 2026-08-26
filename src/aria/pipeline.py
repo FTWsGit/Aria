@@ -1,28 +1,27 @@
 """
-Streaming Pipeline for real-time transcription.
+ASR pipeline: BasePipeline (shared lifecycle) + StreamingPipeline (Sherpa-ONNX).
 
-Config-driven pipeline that supports multiple ASR backends via ModelRegistry.
-Supports streaming (OnlineRecognizer) and chunked (OfflineRecognizer) modes.
+BasePipeline is shared with `livecaptions.pipeline.LiveCaptionsPipeline`, which
+is a different transcription source (Windows-provided text instead of
+audio + local ASR) but follows the same start/stop/on_subtitle shape.
 """
 
 import queue
 import threading
 import time
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 import numpy as np
 
-from ..audio.capture import AudioCapture
-from ..events import SubtitleEvent, TranscriptMessage
-from ..logger import exception, info, transcript
-
-# Import ASR backends and model registry
-from ..model_manager.manager import ModelManager
-from ..model_manager.registry import ModelRegistry
-from ..transcription.base import ChunkedASR, StreamingASR
-from ..transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
-from ..translation.translation_layer import OpenAIConfig, TranslationLayer
-from .base import BasePipeline
+from .audio.capture import AudioCapture
+from .events import SubtitleEvent, TranscriptMessage
+from .logger import debug, exception, info, transcript
+from .model_manager.manager import ModelManager
+from .model_manager.registry import ModelRegistry
+from .transcription.base import ChunkedASR, StreamingASR
+from .transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
+from .translation.translation_layer import OpenAIConfig, TranslationLayer
 
 STREAMING_BACKENDS = {
     "sherpa_onnx": SherpaOnnxStreamingBackend,
@@ -31,6 +30,55 @@ STREAMING_BACKENDS = {
 CHUNKED_BACKENDS = {
     "sherpa_onnx": SherpaOnnxChunkedBackend,
 }
+
+
+class BasePipeline(ABC):
+    """Shared pipeline lifecycle for ASR / LiveCaptions pipelines."""
+
+    def __init__(
+        self,
+        on_subtitle: Callable[[SubtitleEvent], None] | None = None,
+    ):
+        self.on_subtitle = on_subtitle or self._default_callback
+        self._running = False
+
+    @abstractmethod
+    def start(self) -> None:
+        """Start the pipeline."""
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop the pipeline."""
+
+    def _default_callback(self, event: SubtitleEvent) -> None:
+        """Default subtitle callback when no on_subtitle is provided."""
+        debug(f"[{event.language}] {event.text}")
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    @staticmethod
+    def _make_translation_layer(
+        *,
+        enable_translation: bool,
+        translation_engine: str,
+        target_language: str,
+        openai_config: OpenAIConfig | None,
+        on_message: Callable[[TranscriptMessage], None] | None,
+    ) -> TranslationLayer:
+        """Build a TranslationLayer from the pipeline's translation settings.
+
+        Shared by StreamingPipeline and LiveCaptionsPipeline so the
+        translator/state-manager/segmenter wiring lives in exactly one place.
+        """
+        return TranslationLayer(
+            enable_translation=enable_translation,
+            translation_engine=translation_engine,
+            target_language=target_language,
+            openai_config=openai_config or OpenAIConfig(),
+            on_message=on_message,
+        )
 
 
 class StreamingPipeline(BasePipeline):
@@ -105,12 +153,11 @@ class StreamingPipeline(BasePipeline):
             raise ValueError(f"Unsupported ASR kind: {spec.kind}")
 
         # Translation layer (handles translator, state manager, segmenter)
-        _openai_cfg = openai_config or OpenAIConfig()
-        self._translation_layer = TranslationLayer(
+        self._translation_layer = self._make_translation_layer(
             enable_translation=enable_translation,
             translation_engine=translation_engine,
             target_language=target_language,
-            openai_config=_openai_cfg,
+            openai_config=openai_config,
             on_message=on_message,
         )
 

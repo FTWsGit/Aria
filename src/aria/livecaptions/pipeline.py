@@ -8,10 +8,10 @@ from collections.abc import Callable
 
 from ..events import SubtitleEvent, TranscriptMessage
 from ..logger import debug, error, info, warning
-from ..translation.translation_layer import OpenAIConfig, TranslationLayer
-from .base import BasePipeline
-from .livecaptions_controller import LiveCaptionsController
-from .livecaptions_monitor import CaptionEvent, LiveCaptionsMonitor
+from ..pipeline import BasePipeline
+from ..translation.translation_layer import OpenAIConfig
+from .controller import LiveCaptionsController
+from .monitor import CaptionEvent, LiveCaptionsMonitor
 
 
 class LiveCaptionsPipeline(BasePipeline):
@@ -77,12 +77,12 @@ class LiveCaptionsPipeline(BasePipeline):
         self._monitor = LiveCaptionsMonitor(on_caption=self._on_caption, poll_interval=poll_interval)
 
         # Translation layer (handles translator, state manager, segmenter)
-        _openai_cfg = openai_config or OpenAIConfig()
-        self._translation_layer = TranslationLayer(
+        # Shared with StreamingPipeline via BasePipeline._make_translation_layer
+        self._translation_layer = self._make_translation_layer(
             enable_translation=enable_translation,
             translation_engine=translation_engine,
             target_language=target_language,
-            openai_config=_openai_cfg,
+            openai_config=openai_config,
             on_message=on_message,
         )
 

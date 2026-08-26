@@ -14,10 +14,11 @@ from PyQt6.QtWidgets import QApplication
 
 from ..events import SubtitleEvent, TranscriptMessage
 from ..i18n import t
+from ..livecaptions import LiveCaptionsPipeline
 from ..logger import exception, set_log_verbosity, start_simple_log_session
 from ..model_manager.manager import ModelManager
 from ..model_manager.registry import ModelRegistry
-from ..pipelines import LiveCaptionsPipeline, StreamingPipeline
+from ..pipeline import StreamingPipeline
 from ..settings_manager import get_settings_manager
 from ..timezone_utils import set_app_timezone_name
 from .console_window import ConsoleWindow

@@ -7,7 +7,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from ..pipelines import LiveCaptionsPipeline, StreamingPipeline
+from ..livecaptions import LiveCaptionsPipeline
+from ..pipeline import StreamingPipeline
 from ..translation.translation_layer import OpenAIConfig
 
 if TYPE_CHECKING:
