@@ -9,9 +9,10 @@ import threading
 from collections.abc import Callable
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from ..i18n import t
+from .app_icon import render_icon_image
 
 
 class SystemTray:
@@ -49,7 +50,8 @@ class SystemTray:
 
     def _create_icon_image(self, color: str = "#3B8ED0") -> Image.Image:
         """
-        Create tray icon image.
+        Create tray icon image. Drawing lives in the shared app_icon module
+        so tray and taskbar stay identical.
 
         Args:
             color: Icon color (indicates status)
@@ -57,24 +59,7 @@ class SystemTray:
         Returns:
             PIL Image for tray icon
         """
-        # Create a simple circular icon
-        size = 64
-        image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        # Draw outer circle (background)
-        draw.ellipse([4, 4, size - 4, size - 4], fill=color)
-
-        # Draw inner microphone shape
-        mic_color = "white"
-        # Microphone body
-        draw.rounded_rectangle([24, 16, 40, 36], radius=6, fill=mic_color)
-        # Microphone stand
-        draw.arc([20, 24, 44, 48], start=0, end=180, fill=mic_color, width=3)
-        draw.line([32, 48, 32, 52], fill=mic_color, width=3)
-        draw.line([24, 52, 40, 52], fill=mic_color, width=3)
-
-        return image
+        return render_icon_image(size=64, color=color)
 
     def _create_menu(self) -> pystray.Menu:
         """Create the context menu."""

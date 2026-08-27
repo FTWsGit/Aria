@@ -140,6 +140,7 @@ TRANSLATIONS = {
     "btn_clear": "Clear",
     "btn_settings": "Settings",
     "btn_quit": "Quit",
+    "btn_minimize_tray": "Minimize to Tray",
     "chk_topmost": "Always on Top",
     "chk_auto_scroll": "Auto Scroll",
     # Settings window tabs

@@ -179,6 +179,11 @@ class ConsoleWindow(QWidget):
         self._status_label.setStyleSheet("color: #cccccc; font-size: 11px;")
         row.addWidget(self._status_label)
 
+        minimize_btn = QPushButton("_")
+        minimize_btn.setToolTip(t("btn_minimize_tray"))
+        minimize_btn.clicked.connect(self._on_minimize_to_tray)
+        row.addWidget(minimize_btn)
+
         quit_btn = QPushButton(t("btn_quit"))
         quit_btn.clicked.connect(self.quit_clicked.emit)
         row.addWidget(quit_btn)
@@ -326,5 +331,10 @@ class ConsoleWindow(QWidget):
         # Closing the console minimizes the whole app to the tray, same as
         # the old settings-window behaviour, instead of quitting outright.
         event.ignore()
+        self.hide()
+        self.closed.emit()
+
+    def _on_minimize_to_tray(self) -> None:
+        """Hide to tray with the same notification path as closeEvent."""
         self.hide()
         self.closed.emit()

@@ -21,6 +21,7 @@ from ..model_manager.registry import ModelRegistry
 from ..pipeline import StreamingPipeline
 from ..settings_manager import get_settings_manager
 from ..timezone_utils import set_app_timezone_name
+from .app_icon import create_app_icon
 from .console_window import ConsoleWindow
 from .pipeline_factory import PipelineFactory
 from .settings_window import SettingsWindow
@@ -72,6 +73,8 @@ class App:
         # Create QApplication
         self._app = QApplication(sys.argv)
         self._app.setApplicationName("ARIA")
+        # Child windows (console, overlays) inherit this unless they set their own.
+        self._app.setWindowIcon(create_app_icon())
         self._app.setFont(QFont("Segoe UI", 9))
         # Closing an auxiliary window (settings) must never quit the app;
         # only the console's Quit button / tray Quit should do that.
@@ -134,9 +137,12 @@ class App:
             self._tray.show_notification(t("tray_minimized_title"), t("tray_minimized_msg"))
 
     def _on_show_settings(self) -> None:
-        """Open (or raise) the settings window from the console's Settings button."""
-        self._settings_window.show()
-        self._settings_window.activateWindow()
+        """Toggle the settings window from the console's Settings button."""
+        if self._settings_window.isVisible():
+            self._settings_window.hide()
+        else:
+            self._settings_window.show()
+            self._settings_window.activateWindow()
 
     def _on_console_start(self) -> None:
         """Console's start button: gather settings and start the pipeline."""

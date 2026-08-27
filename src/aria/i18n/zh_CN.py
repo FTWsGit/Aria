@@ -140,6 +140,7 @@ TRANSLATIONS = {
     "btn_clear": "清屏",
     "btn_settings": "设置",
     "btn_quit": "退出",
+    "btn_minimize_tray": "最小化到托盘",
     "chk_topmost": "始终置顶",
     "chk_auto_scroll": "自动滚动",
     # Settings window tabs
