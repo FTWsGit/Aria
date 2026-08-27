@@ -7,6 +7,7 @@
 """
 
 import sys
+sys.stdout.reconfigure(encoding='utf-8')
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent / ".agents" / "skills" / "docs-read" / "scripts"
