@@ -8,12 +8,12 @@ import sys
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from ...i18n import t
@@ -23,81 +23,42 @@ from ...settings_manager import get_settings_manager
 class GeneralTabMixin:
     """Mixin providing general tab UI and event handlers."""
 
-    def _create_reset_card(self):
-        """Create reset settings card."""
-        card = QFrame()
-        card.setStyleSheet("background: transparent;")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(0, 0, 0, 0)
+    def _create_general_tab(self):
+        """Create the general settings page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setSpacing(8)
+
+        self.overlay_toggle_button = QPushButton(t("overlay_hide"))
+        self.overlay_toggle_button.clicked.connect(self._on_toggle_overlay)
+        overlay_row = QHBoxLayout()
+        overlay_row.setSpacing(10)
+        overlay_row.addWidget(self.overlay_toggle_button)
+        overlay_row.addStretch()
+        layout.addLayout(overlay_row)
 
         button_row = QHBoxLayout()
         button_row.setSpacing(10)
 
-        quick_row = QHBoxLayout()
-        quick_row.setSpacing(10)
-
-        self.overlay_toggle_button = QPushButton(t("overlay_hide"))
-        self.overlay_toggle_button.setStyleSheet("""
-            QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #c0c0c0;
-                color: #444444;
-                border-radius: 4px;
-                padding: 8px 18px;
-            }
-            QPushButton:hover {
-                background-color: #f0f0f0;
-                border-color: #0078D4;
-            }
-        """)
-        self.overlay_toggle_button.clicked.connect(self._on_toggle_overlay)
-        quick_row.addWidget(self.overlay_toggle_button)
-
-        layout.addLayout(quick_row)
-
-        self.reset_button = QPushButton("🔄 " + t("reset_settings"))
-        self.reset_button.setStyleSheet("""
-            QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #c0c0c0;
-                color: #444444;
-                border-radius: 4px;
-                padding: 8px 18px;
-            }
-            QPushButton:hover {
-                background-color: #f0f0f0;
-                border-color: #0078D4;
-            }
-        """)
+        self.reset_button = QPushButton(t("reset_settings"))
         self.reset_button.clicked.connect(self._on_reset_settings)
         button_row.addWidget(self.reset_button)
 
-        self.quit_button = QPushButton("⏻ " + t("quit_app"))
-        self.quit_button.setStyleSheet("""
-            QPushButton {
-                background-color: #ffffff;
-                border: 1px solid #c0c0c0;
-                color: #444444;
-                border-radius: 4px;
-                padding: 8px 18px;
-            }
-            QPushButton:hover {
-                background-color: #fdf0f0;
-                border-color: #E04040;
-                color: #c0392b;
-            }
-        """)
+        self.quit_button = QPushButton(t("quit_app"))
         self.quit_button.clicked.connect(self._on_quit_app)
         button_row.addWidget(self.quit_button)
 
+        button_row.addStretch()
         layout.addLayout(button_row)
 
         reset_desc = QLabel(t("reset_settings_desc"))
-        reset_desc.setStyleSheet("color: #666666; font-size: 12px;")
-        reset_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        reset_desc.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(reset_desc)
 
-        return card
+        layout.addStretch(1)
+
+        return page
 
     def _on_reset_settings(self):
         """Reset all settings."""

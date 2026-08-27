@@ -110,7 +110,6 @@ TRANSLATIONS = {
     "error_asr_backend_failed": "ASR service error, stopped automatically",
     "error_translation_unavailable": "Translation service temporarily unavailable",
     "error_pipeline_startup": "Failed to start ASR service, check configuration",
-    "open_model_manager_btn": "Open Model Manager",
     "model_required_download_title": "Model Not Downloaded",
     "model_required_download_msg": "Model '{model_id}' has not been downloaded.\nPlease download it in Model Manager first.",
     # Tray menu
@@ -121,6 +120,7 @@ TRANSLATIONS = {
     "audio_source_system": "System Audio",
     "audio_source_mic": "Microphone (System Default)",
     "audio_source_label": "Audio Source:",
+    "timezone_label": "Timezone (IANA):",
     # Overlay toggle
     "overlay_hide": "Hide Subtitle Overlay",
     "overlay_show": "Show Subtitle Overlay",
@@ -147,4 +147,9 @@ TRANSLATIONS = {
     "tab_translation": "Translation",
     "tab_general": "General",
     "settings_window_title": "ARIA Settings",
+    # Model tab
+    "tab_models": "Models",
+    "downloaded": "Downloaded",
+    "not_downloaded": "Not downloaded",
+    "delete_model_confirm": 'Delete model "{name}"?\nThe downloaded files will be removed from disk.',
 }

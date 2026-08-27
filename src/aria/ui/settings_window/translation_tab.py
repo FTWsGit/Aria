@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -23,25 +24,35 @@ from ..styles import OPENAI_OVERLAY_STYLE
 class TranslationTabMixin:
     """Mixin providing translation tab UI, OpenAI overlay, and event handlers."""
 
-    def _create_translation_card(self):
-        """Create translation settings card."""
-        card, layout = self._create_card(t("translation_settings"))
+    def _create_translation_tab(self):
+        """Create the translation settings page."""
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 10, 12, 12)
+        layout.setSpacing(8)
+
+        grid = QGridLayout()
+        grid.setColumnStretch(0, 1)
+        grid.setColumnMinimumWidth(1, 180)
 
         # Translation switch
-        trans_row = QHBoxLayout()
-        trans_row.addWidget(QLabel(t("translation") + ":"))
+        grid.addWidget(QLabel(t("translation") + ":"), 0, 0)
+        trans_widget = QWidget()
+        trans_row = QHBoxLayout(trans_widget)
+        trans_row.setContentsMargins(0, 0, 0, 0)
         self.trans_checkbox = QCheckBox()
         self.trans_checkbox.stateChanged.connect(self._on_translation_change)
         trans_row.addWidget(self.trans_checkbox)
         self.trans_status = QLabel("OFF")
-        self.trans_status.setStyleSheet("color: #666666;")
         trans_row.addWidget(self.trans_status)
         trans_row.addStretch()
-        layout.addLayout(trans_row)
+        grid.addWidget(trans_widget, 0, 1)
 
         # Engine dropdown
-        engine_row = QHBoxLayout()
-        engine_row.addWidget(QLabel(t("engine") + ":"))
+        grid.addWidget(QLabel(t("engine") + ":"), 1, 0)
+        engine_widget = QWidget()
+        engine_row = QHBoxLayout(engine_widget)
+        engine_row.setContentsMargins(0, 0, 0, 0)
         self.trans_engine_dropdown = QComboBox()
         self.trans_engine_dropdown.addItems(
             [
@@ -55,29 +66,28 @@ class TranslationTabMixin:
         engine_row.addWidget(self.trans_engine_dropdown)
 
         self.openai_config_btn = QPushButton(t("configure"))
-        self.openai_config_btn.setObjectName("secondary")
         self.openai_config_btn.setMaximumWidth(100)
         self.openai_config_btn.clicked.connect(self._show_openai_overlay)
         self.openai_config_btn.hide()
         engine_row.addWidget(self.openai_config_btn)
 
         engine_row.addStretch()
-        layout.addLayout(engine_row)
+        grid.addWidget(engine_widget, 1, 1)
 
         # Target language dropdown
-        target_row = QHBoxLayout()
-        target_row.addWidget(QLabel(t("target_lang") + ":"))
+        grid.addWidget(QLabel(t("target_lang") + ":"), 2, 0)
         self.target_lang_dropdown = QComboBox()
         from ...translation.language_names import get_target_language_options
 
         for display_name, _code in get_target_language_options():
             self.target_lang_dropdown.addItem(display_name, _code)
         self.target_lang_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
-        target_row.addWidget(self.target_lang_dropdown)
-        target_row.addStretch()
-        layout.addLayout(target_row)
+        grid.addWidget(self.target_lang_dropdown, 2, 1)
 
-        return card
+        layout.addLayout(grid)
+        layout.addStretch(1)
+
+        return page
 
     def _create_openai_overlay(self, parent: QWidget):
         """Create the OpenAI config overlay panel. Covers the content area."""
@@ -92,7 +102,6 @@ class TranslationTabMixin:
 
         # Back button
         back_btn = QPushButton("← " + t("back"))
-        back_btn.setObjectName("secondary")
         back_btn.setMaximumWidth(100)
         back_btn.clicked.connect(self._hide_openai_overlay)
         overlay_layout.addWidget(back_btn)
@@ -169,10 +178,8 @@ class TranslationTabMixin:
         """Handle translation checkbox change."""
         if state:
             self.trans_status.setText("ON")
-            self.trans_status.setStyleSheet("color: #0078D4;")
         else:
             self.trans_status.setText("OFF")
-            self.trans_status.setStyleSheet("color: #666666;")
         self._persist_ui_settings()
 
     def _on_engine_change(self, _text: str):

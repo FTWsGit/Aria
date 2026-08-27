@@ -1,22 +1,19 @@
 """
 Main Settings Window for ARIA using PyQt6.
 
-A modern, beautiful settings interface.
+A native Windows-style settings interface.
 """
 
 from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QFrame,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMessageBox,
-    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -25,59 +22,14 @@ from PyQt6.QtWidgets import (
 from ...i18n import LANGUAGES, get_current_language, set_language, t
 from ...settings_manager import get_settings_manager
 from ...timezone_utils import validate_timezone_name
-from ..styles import MAIN_STYLESHEET
 from .general_tab import GeneralTabMixin
+from .model_tab import ModelTabMixin
 from .recognition_tab import RecognitionTabMixin
 from .translation_tab import TranslationTabMixin
 
 
-class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, GeneralTabMixin):
-    """Main settings window with model selection, language, VAD options, etc."""
-
-    # Model options
-    LANGUAGE_CODES = [None, "zh", "en", "ja", "ko", "yue", "es", "fr", "de"]
-
-    @staticmethod
-    def _get_asr_languages():
-        """Get available languages for asr mode."""
-        return [
-            ("中/英文", "zh"),
-            ("日文", "ja"),
-        ]
-
-    @staticmethod
-    def _get_streaming_model_for_language(lang_code: str) -> str:
-        """Get the streaming model ID for a language."""
-        if lang_code in ["zh", "en"]:
-            return "sherpa-zh-en"
-        elif lang_code == "ja":
-            return "vosk-ja"
-        return "sherpa-zh-en"
-
-    @staticmethod
-    def _get_languages():
-        """Get languages list with translated display names."""
-        return [
-            (t("auto_detect"), None),
-            ("中文（简体）", "zh_hans"),
-            ("中文（繁体）", "zh_hant"),
-            (t("lang_english"), "en"),
-            (t("lang_japanese"), "ja"),
-            (t("lang_korean"), "ko"),
-            (t("lang_cantonese"), "yue"),
-            (t("lang_spanish"), "es"),
-            (t("lang_french"), "fr"),
-            (t("lang_german"), "de"),
-            (t("lang_russian"), "ru"),
-        ]
-
-    @property
-    def asr_LANGUAGES(self):
-        return self._get_asr_languages()
-
-    @property
-    def LANGUAGES(self):
-        return self._get_languages()
+class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, TranslationTabMixin, GeneralTabMixin):
+    """Main settings window with one functional domain per tab."""
 
     def __init__(
         self,
@@ -103,9 +55,8 @@ class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, Gene
         # ConsoleWindow (not this window) is the app's main/taskbar window.
         self.setWindowTitle(t("settings_window_title"))
         self.setWindowFlags(Qt.WindowType.Tool)
-        self.setMinimumSize(820, 620)
-        self.resize(860, 700)
-        self.setStyleSheet(self._get_stylesheet())
+        self.setMinimumSize(520, 500)
+        self.resize(520, 600)
 
         # Center on screen
         self._center_on_screen()
@@ -126,10 +77,6 @@ class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, Gene
             y = (screen_geometry.height() - self.height()) // 2
             self.move(x, y)
 
-    def _get_stylesheet(self):
-        """Return the main stylesheet: a plain, light Windows-style theme."""
-        return MAIN_STYLESHEET
-
     def _create_ui(self):
         """Create all UI components."""
         # Central widget
@@ -143,77 +90,30 @@ class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, Gene
 
         # === Header (fixed, not scrollable) ===
         header = self._create_header()
-        header.setContentsMargins(20, 20, 20, 10)
+        header.setContentsMargins(10, 8, 10, 5)
         main_layout.addWidget(header)
 
-        # === Tabbed content area ===
+        # === Tabbed content area: one functional domain per tab ===
         self.tabs = QTabWidget()
 
-        self.tabs.addTab(
-            self._create_tab_page([self._create_recognition_card(), self._create_model_card()]),
-            t("tab_recognition"),
-        )
-        self.tabs.addTab(self._create_tab_page([self._create_translation_card()]), t("tab_translation"))
-        self.tabs.addTab(self._create_tab_page([self._create_reset_card()]), t("tab_general"))
+        self.tabs.addTab(self._create_recognition_tab(), t("tab_recognition"))
+        self.tabs.addTab(self._create_model_tab(), t("tab_models"))
+        self.tabs.addTab(self._create_translation_tab(), t("tab_translation"))
+        self.tabs.addTab(self._create_general_tab(), t("tab_general"))
 
         main_layout.addWidget(self.tabs)
 
         # === OpenAI config overlay (hidden by default) ===
         self._create_openai_overlay(central)
 
-    def _create_tab_page(self, cards: list) -> QScrollArea:
-        """Wrap a list of setting cards in a scrollable tab page."""
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { background-color: transparent; border: none; }")
-
-        content = QWidget()
-        content.setStyleSheet("background-color: #ffffff;")
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(20, 15, 20, 20)
-        layout.setSpacing(15)
-        for card in cards:
-            layout.addWidget(card)
-        layout.addStretch()
-
-        scroll.setWidget(content)
-        return scroll
-
     def _create_header(self):
-        """Create header with title and language selector."""
+        """Create a minimal header with language selector."""
         header = QFrame()
         layout = QHBoxLayout(header)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Left spacer (same width as language selector for balance)
-        left_spacer = QWidget()
-        left_spacer.setFixedWidth(210)
-        layout.addWidget(left_spacer)
-
-        # Spacer
         layout.addStretch()
 
-        # Title (centered)
-        title_container = QVBoxLayout()
-
-        title = QLabel("ARIA")
-        title.setFont(QFont("", 22, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_container.addWidget(title)
-
-        subtitle = QLabel(t("subtitle"))
-        subtitle.setStyleSheet("color: #666666; font-size: 12px;")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_container.addWidget(subtitle)
-
-        layout.addLayout(title_container)
-
-        # Spacer
-        layout.addStretch()
-
-        # Language selector (right side)
         self.lang_selector = QComboBox()
         lang_options = [LANGUAGES[code][0] for code in LANGUAGES]
         self.lang_selector.addItems(lang_options)
@@ -225,22 +125,6 @@ class SettingsWindow(QMainWindow, RecognitionTabMixin, TranslationTabMixin, Gene
         layout.addWidget(self.lang_selector)
 
         return header
-
-    def _create_card(self, title: str) -> tuple:
-        """Create a card frame with title. Returns (frame, content_layout)."""
-        frame = QFrame()
-        frame.setObjectName("card")
-        frame.setMaximumWidth(400)
-        layout = QVBoxLayout(frame)
-        layout.setContentsMargins(18, 15, 18, 15)
-        layout.setSpacing(12)
-
-        # Title
-        title_label = QLabel(title)
-        title_label.setFont(QFont("", 13, QFont.Weight.Bold))
-        layout.addWidget(title_label)
-
-        return frame, layout
 
     def resizeEvent(self, event):
         """Reposition overlay when window resizes."""

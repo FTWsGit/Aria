@@ -15,14 +15,14 @@ alwaysApply: false
 | 加一个新的 ASR backend | 实现 `StreamingASR` 或 `ChunkedASR` Protocol，在 `pipeline.py` 的 `ASR_BACKENDS` 注册 |
 | 加一个新的翻译引擎 | 在 `translation/` 目录添加 translator 类，`create_translator()` 工厂函数新增 engine 分支 |
 | 加一个新的模型 | 在 `models/` 目录加 yaml 文件，`ModelRegistry` 自动扫描；无需改代码 |
-| 加一个新的设置项 | `settings_manager.py` 的 `DEFAULT_SETTINGS` 加默认值 + `settings_window.py` 添加 UI 控件 |
+| 加一个新的设置项 | `settings_manager.py` 的 `DEFAULT_SETTINGS` 加默认值 + `settings_window/` 对应 tab 添加 UI 控件 |
 | 加一个新的事件类型 | `events.py` 定义 dataclass，`PipelineSignals` 添加对应 `pyqtSignal` |
 | 加一个新的悬浮窗 | 继承 `SubtitleOverlay` 或复用 `SubtitleOverlay` 实例，源字幕和翻译字幕分离 |
 | 加一个新的 UI 页面 | 在 `ui/` 目录加 QWidget 子类，`App._on_start()` 中根据 settings 决定是否创建 |
 | 加一个新的托盘菜单项 | `system_tray.py` 添加菜单项，连接对应槽函数 |
 | 加一个新的 ModelManager 下载源 | `model_manager/manager.py` 按 `source.type` 分发，新增 `url_zip`/`url_tar` 等类型的处理逻辑 |
-| 加一个新的 Settings 卡片 | `settings_window.py` 的 `_create_xxx_card()` 模式，`_gather_settings()` 收集字段 |
-| 加一个新的 OpenAI 覆盖面板字段 | `settings_window.py` 的 `_create_openai_overlay()` 模式，`_show_openai_overlay()` 控制显隐 |
+| 加一个新的设置 tab | `settings_window/` 新增 mixin 文件定义 `_create_xxx_tab()`，`__init__.py` 继承并在 `_create_ui()` 注册，`_gather_settings()` 收集字段 |
+| 加一个新的 OpenAI 覆盖面板字段 | `settings_window/translation_tab.py` 的 `_create_openai_overlay()` 模式，`_show_openai_overlay()` 控制显隐 |
 
 ## 跨线程通信
 

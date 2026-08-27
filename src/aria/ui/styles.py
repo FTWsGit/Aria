@@ -6,10 +6,11 @@ Extracted from inline CSS strings to keep Python layout code readable.
 
 # ── OpenAI overlay panel ────────────────────────────────────────────
 
+# palette() 角色跟随系统明暗主题，避免深色模式下出现浅字浅底
 OPENAI_OVERLAY_STYLE = """
     QFrame#openai_overlay {
-        background-color: #ffffff;
-        border: 1px solid #d0d0d0;
+        background-color: palette(window);
+        border: 1px solid palette(mid);
     }
 """
 

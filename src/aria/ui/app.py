@@ -342,7 +342,7 @@ class App:
             self._tray.update_status(False)
 
     def _check_all_required_models(self, settings: dict) -> bool:
-        """Check if all required models are available and prompt to download if not."""
+        """Check if all required models are available; open settings if not."""
         mode = settings.get("mode", "asr")
         if mode == "livecaptions":
             return True
@@ -354,22 +354,7 @@ class App:
             return True
 
         if not self._model_manager.is_downloaded(spec):
-            from PyQt6.QtWidgets import QMessageBox, QPushButton
-
-            msg = t("model_required_download_msg", model_id=model_id)
-            dlg = QMessageBox(QMessageBox.Icon.Warning, t("model_required_download_title"), msg)
-            btn_open = QPushButton(t("open_model_manager_btn"))
-            dlg.addButton(btn_open, QMessageBox.ButtonRole.AcceptRole)
-            dlg.addButton(QMessageBox.StandardButton.Cancel)
-            dlg.setDefaultButton(btn_open)
-
-            def on_btn_clicked():
-                if dlg.clickedButton() is btn_open:
-                    self._settings_window._on_manage_models()
-                dlg.close()
-
-            btn_open.clicked.connect(on_btn_clicked)
-            dlg.exec()
+            self._on_show_settings()
             return False
 
         return True
