@@ -69,4 +69,3 @@ uv run python -c "import aria; print('import ok')"
 ## Working Rules(IMPORTANT!)
 - Use Chinese to talk with user
 - Never work with project when user did not ask for it
-- Before each batch of tool calls, say in ONE short sentence, in the user's language (no more than ~12 words), what you're about to do.
