@@ -1,6 +1,6 @@
 ---
 name: docs-read
-description: ARIA 项目的读码前置纪律。任何需要理解这个项目才能回答的任务——加功能、修 bug、重构、改代码，也包括纯解释/讨论/排查口吻的提问（"这个字段是不是放错地方了""这个逻辑怎么解析的""XX 是怎么实现的""修一下这个 bug"）——动手读代码/写代码之前用。
+description: Pre-reading discipline for the ARIA project. Use before reading or writing code for any task that requires understanding the project to answer—adding features, fixing bugs, refactoring, modifying code, and also purely explanatory/discussion/troubleshooting questions ("is this field in the wrong place?", "how is this logic parsed?", "how is XX implemented?", "fix this bug").
 ---
 
 # 读码前置纪律

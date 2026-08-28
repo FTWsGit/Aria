@@ -1,26 +1,26 @@
 # AGENTS.md
 
-## 项目概述
+## Project Overview
 
-ARIA 是一个 Windows 桌面应用，捕获系统音频或麦克风输入，在可移动的 PyQt6 悬浮窗中实时渲染转录文本。目前有两条识别路径：Sherpa-ONNX 流式识别和 Windows 11 内建字幕。翻译是独立层，支持在线和本地。项目要求 Python 3.10+，仅支持 Windows。
+ARIA is a Windows desktop app that captures system audio or microphone input and renders transcription text in real time in a movable PyQt6 overlay window. There are currently two recognition paths: Sherpa-ONNX streaming recognition and the Windows 11 built-in captions. Translation is a separate layer, supporting both online and local. The project requires Python 3.10+ and only supports Windows.
 
-## 开发环境
+## Development Environment
 
-要求：
+Requirements:
 
-- Windows 10/11。
-- Python >= 3.10。
-- 使用 uv 管理虚拟环境和依赖。
+- Windows 10/11.
+- Python >= 3.10.
+- Use uv to manage the virtual environment and dependencies.
 
-运行应用：
+Run the app:
 
 ```powershell
 uv run aria
 ```
 
-## 验证命令
+## Verification Commands
 
-始终使用 uv。提交前先跑最相关的检查，再跑完整套件：
+Always use uv. Before committing, run the most relevant checks first, then the full suite:
 
 ```powershell
 uv run ruff format
@@ -28,43 +28,43 @@ uv run ruff check --fix
 uv run pytest
 ```
 
-打包/导入测试：
+Packaging/import test:
 
 ```powershell
 uv run python -c "import aria; print('import ok')"
 ```
 
-如果测试需要 Windows 音频设备、GUI 交互、CUDA 或已安装的模型，请注明限制，不要伪造测试结果。
+If a test requires Windows audio devices, GUI interaction, CUDA, or an installed model, note the limitation — do not fake test results.
 
 
-## 注释/文档纪律
+## Comment/Documentation Discipline
 
-- 注释/文档只写**做了什么、为什么**。不写"怎么摸索到的、历史上踩过什么坑、为什么没用另一方案"。对比可行 vs 不可行、踩坑史、淘汰方案是 git log / issue tracker 的事，不进注释
-- 注释中绝不提及或引用任何外部文档，不能用诸如`详情见xxx.mdc`、`具体看xxx领域的文档`
-- 一句话能写的规矩**不用扩成一段论证**。论证口头给用户讲，不写进文件；AI 读到对应代码/类型自会懂为什么，不用注释先讲一遍
-- 不给已有代码补解释性注释
+- Comments/docs state only **what was it and why**. Do not write "how it was figured out, what pitfalls were hit historically, why another approach was not used". Feasible vs infeasible comparisons, pitfall history, and rejected alternatives belong in git log / issue trackers, not in comments
+- Never mention or reference any external document in comments — no `see xxx.mdc for details` or `see the xxx domain docs`
+- A rule that can be stated in one sentence **should not be expanded into a paragraph of argument**. The argument is explained to the user verbally, not written into the file; an AI reading the corresponding code/types will understand why on its own — the comment does not need to explain it first
+- Do not add explanatory comments to existing code
 
-- 文档 只写"项目是什么"，不写用户的要求、展望，不写讨论过程，不写其他方案，不写其他文档的内容
-- `description`骨架提示只写**是什么、何时读**。不写写法理论、不写"不是什么"。
+- Docs state only "what the project is" — not the user's requirements, not outlook, not the discussion process, not alternative approaches, not the content of other documents
+- The `description` skeleton hint states only **what it is and when to read it**. No writing-theory, no "what it is not".
 
-## 架构规则
+## Architecture Rules
 
-- 保持音频捕获、ASR、翻译、UI 的分离。
+- Keep audio capture, ASR, translation, and UI separated.
 
-## UI 和 UX 规则
+## UI and UX Rules
 
-- 转录/渲染工作保持在 Qt UI 线程之外。
-- 保持可移动/可调整大小的字幕和翻译悬浮窗，除非任务明确改变交互模式。
-- 避免在 UI 线程中阻塞网络调用或模型下载。
-- 保持源字幕和翻译字幕逻辑分离，以便可以独立禁用。
-- 遵循 `i18n/` 下的本地化模式；存在翻译 key 时不要硬编码用户可见字符串。
+- Keep transcription/rendering work off the Qt UI thread.
+- Keep the subtitle and translation overlay windows movable/resizable, unless the task explicitly changes the interaction model.
+- Avoid blocking network calls or model downloads on the UI thread.
+- Keep the source-subtitle and translated-subtitle logic separate so either can be disabled independently.
+- Follow the localization pattern under `i18n/`; do not hardcode user-visible strings when a translation key exists.
 
-## Windows 特定规则
+## Windows-Specific Rules
 
-- 将 WASAPI loopback 和 Windows 内建字幕集成视为平台特定代码；将平台假设与核心管道逻辑隔离。
-- 修改 `audio/` 时同时测试系统音频和麦克风路径。
-- 注意设备枚举、默认设备变更、采样率和停止/重启时的资源清理。
-- 不要假设需要或已获得管理员权限。
+- Treat WASAPI loopback and the Windows built-in captions integration as platform-specific code; isolate platform assumptions from core pipeline logic.
+- When modifying `audio/`, test both the system-audio and microphone paths.
+- Be careful with device enumeration, default-device changes, sample rates, and resource cleanup on stop/restart.
+- Do not assume that admin privileges are required or have been granted.
 
 ## Working Rules(IMPORTANT!)
 - Use Chinese to talk with user

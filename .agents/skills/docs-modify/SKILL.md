@@ -1,6 +1,6 @@
 ---
 name: docs-modify
-description: ARIA 项目的 docs 文档同步纪律。本轮任务真的发生了代码改动，`uv run pytest` 通过之后，需要修改文档时使用。
+description: Documentation sync discipline for the ARIA project. Use when the current task actually made code changes, `uv run pytest` passes, and docs need to be updated.
 ---
 
 # 文档同步纪律
