@@ -21,14 +21,40 @@ class PipelineFactory:
     """Factory for creating pipeline instances based on mode."""
 
     @staticmethod
+    def _resolve_model_id(
+        settings: dict,
+        registry: ModelRegistry,
+        on_error: Callable[[str], None],
+    ) -> str | None:
+        """Resolve model_id from settings, falling back to first available model.
+
+        Returns None when registry is empty (error is emitted via on_error).
+        """
+        model_id = settings.get("model_id")
+        if model_id:
+            try:
+                registry.get(model_id)
+                return model_id
+            except KeyError:
+                pass
+        all_models = registry.list()
+        if all_models:
+            return all_models[0].id
+        on_error("error_no_models_available")
+        return None
+
+    @staticmethod
     def create_streaming_pipeline(
         settings: dict,
         registry: ModelRegistry,
         model_manager: ModelManager,
         signals: PipelineSignals,
         on_error: Callable[[str], None],
-    ) -> StreamingPipeline:
-        """Create a StreamingPipeline for Sherpa-ONNX ASR."""
+    ) -> StreamingPipeline | None:
+        """Create a StreamingPipeline for Sherpa-ONNX ASR.
+
+        Returns None when no model is available (error already emitted via on_error).
+        """
         openai_cfg = OpenAIConfig(
             endpoint=settings.get("openai_endpoint", "http://127.0.0.1:1234/v1"),
             api_key=settings.get("openai_api_key", ""),
@@ -37,7 +63,9 @@ class PipelineFactory:
             max_tokens=settings.get("openai_max_tokens", 1024),
             system_prompt=settings.get("openai_system_prompt", ""),
         )
-        model_id = settings.get("model_id") or "sherpa-zh-en-zipformer"
+        model_id = PipelineFactory._resolve_model_id(settings, registry, on_error)
+        if model_id is None:
+            return None
         return StreamingPipeline(
             model_id=model_id,
             registry=registry,

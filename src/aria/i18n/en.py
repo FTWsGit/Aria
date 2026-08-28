@@ -110,6 +110,7 @@ TRANSLATIONS = {
     "error_asr_backend_failed": "ASR service error, stopped automatically",
     "error_translation_unavailable": "Translation service temporarily unavailable",
     "error_pipeline_startup": "Failed to start ASR service, check configuration",
+    "error_no_models_available": "No recognition models available. Please download a model in Model Manager first.",
     "model_required_download_title": "Model Not Downloaded",
     "model_required_download_msg": "Model '{model_id}' has not been downloaded.\nPlease download it in Model Manager first.",
     # Tray menu

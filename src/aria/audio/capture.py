@@ -203,50 +203,62 @@ class AudioCapture:
         self._callback = callback
         self._is_running = True
 
-        # Default: WASAPI loopback (system) or microphone input
-        if pyaudio is None:
+        try:
+            # Default: WASAPI loopback (system) or microphone input
+            if pyaudio is None:
+                raise ImportError(
+                    "pyaudiowpatch is required for audio capture. Install it with: pip install PyAudioWPatch"
+                )
+            if self._pyaudio is None:
+                self._pyaudio = pyaudio.PyAudio()
+
+            if self._source == "system":
+                device = self._get_loopback_device()
+                source_name = "system audio"
+            elif self._source.startswith(self.MIC_SOURCE_PREFIX):
+                device = self._get_microphone_device()
+                source_name = "microphone"
+            else:
+                device = self._get_loopback_device()
+                source_name = "system audio"
+
+            device_rate = int(device["defaultSampleRate"])
+            channels = int(device["maxInputChannels"])
+            chunk_size = self._calculate_chunk_size(device_rate)
+
+            info(f"AudioCapture: Using {source_name} device: {device['name']}")
+            info(f"AudioCapture: Device rate: {device_rate}Hz, Channels: {channels}")
+            debug(f"AudioCapture: Chunk size: {chunk_size} frames ({self.CHUNK_DURATION_MS}ms)")
+
+            self._stream = self._pyaudio.open(
+                format=pyaudio.paFloat32,
+                channels=channels,
+                rate=device_rate,
+                input=True,
+                input_device_index=device["index"],
+                frames_per_buffer=chunk_size,
+                stream_callback=self._audio_callback,
+            )
+
+            self._capture_thread = threading.Thread(
+                target=self._process_audio_loop,
+                args=(device_rate, channels),
+                daemon=True,
+            )
+            self._capture_thread.start()
+
+            self._stream.start_stream()
+            info(f"AudioCapture: Started capturing {source_name}")
+        except:
             self._is_running = False
-            raise ImportError("pyaudiowpatch is required for audio capture. Install it with: pip install PyAudioWPatch")
-        if self._pyaudio is None:
-            self._pyaudio = pyaudio.PyAudio()
-
-        if self._source == "system":
-            device = self._get_loopback_device()
-            source_name = "system audio"
-        elif self._source.startswith(self.MIC_SOURCE_PREFIX):
-            device = self._get_microphone_device()
-            source_name = "microphone"
-        else:
-            device = self._get_loopback_device()
-            source_name = "system audio"
-
-        device_rate = int(device["defaultSampleRate"])
-        channels = int(device["maxInputChannels"])
-        chunk_size = self._calculate_chunk_size(device_rate)
-
-        info(f"AudioCapture: Using {source_name} device: {device['name']}")
-        info(f"AudioCapture: Device rate: {device_rate}Hz, Channels: {channels}")
-        debug(f"AudioCapture: Chunk size: {chunk_size} frames ({self.CHUNK_DURATION_MS}ms)")
-
-        self._stream = self._pyaudio.open(
-            format=pyaudio.paFloat32,
-            channels=channels,
-            rate=device_rate,
-            input=True,
-            input_device_index=device["index"],
-            frames_per_buffer=chunk_size,
-            stream_callback=self._audio_callback,
-        )
-
-        self._capture_thread = threading.Thread(
-            target=self._process_audio_loop,
-            args=(device_rate, channels),
-            daemon=True,
-        )
-        self._capture_thread.start()
-
-        self._stream.start_stream()
-        info(f"AudioCapture: Started capturing {source_name}")
+            if self._stream:
+                self._stream.close()
+                self._stream = None
+            if self._pyaudio:
+                self._pyaudio.terminate()
+                self._pyaudio = None
+            self._capture_thread = None
+            raise
 
     def stop(self) -> None:
         """Stop capturing audio."""

@@ -331,24 +331,38 @@ class StreamingPipeline(BasePipeline):
 
         self._running = True
 
-        # Reset state
-        self._latest_raw_text = ""
-        self._new_text_event.clear()
+        try:
+            # Reset state
+            self._latest_raw_text = ""
+            self._new_text_event.clear()
+            self._chunk_buffer = []
+            self._chunk_samples = 0
+            self._translation_layer.reset()
 
-        self._translation_layer.reset()
+            # Start audio capture first
+            self._audio_capture.start(callback=self._on_audio)
 
-        # Start threads
-        self._process_thread = threading.Thread(target=self._process_loop, daemon=True, name="StreamingPipeline_ASR")
-        self._process_thread.start()
-
-        if self._translation_layer.is_active:
-            self._translation_thread = threading.Thread(
-                target=self._translation_loop, daemon=True, name="StreamingPipeline_Translation"
+            # Start threads
+            self._process_thread = threading.Thread(
+                target=self._process_loop, daemon=True, name="StreamingPipeline_ASR"
             )
-            self._translation_thread.start()
+            self._process_thread.start()
 
-        # Start audio capture
-        self._audio_capture.start(callback=self._on_audio)
+            if self._translation_layer.is_active:
+                self._translation_thread = threading.Thread(
+                    target=self._translation_loop, daemon=True, name="StreamingPipeline_Translation"
+                )
+                self._translation_thread.start()
+        except Exception:
+            # Rollback: return to "not running" state
+            self._running = False
+            self._new_text_event.set()
+            self._audio_capture.stop()
+            if self._process_thread and self._process_thread.is_alive():
+                self._process_thread.join(timeout=2.0)
+            if self._translation_thread and self._translation_thread.is_alive():
+                self._translation_thread.join(timeout=2.0)
+            raise
 
         info("StreamingPipeline started")
 

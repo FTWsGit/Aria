@@ -179,10 +179,7 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
         else:
             lang_code = None
             idx = self.model_dropdown.currentIndex()
-            if idx >= 0:
-                model_id = self.model_dropdown.itemData(idx) or "sherpa-zh-en-zipformer"
-            else:
-                model_id = "sherpa-zh-en-zipformer"
+            model_id = self.model_dropdown.itemData(idx) if idx >= 0 else None
 
         target_lang = self._get_target_language_code()
 
@@ -244,10 +241,11 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
             mode = "asr"
         self._on_mode_change(mode)
 
-        model_id = sm.get("model_id", "sherpa-zh-en-zipformer")
-        idx = self.model_dropdown.findData(model_id)
-        if idx >= 0:
-            self.model_dropdown.setCurrentIndex(idx)
+        model_id = sm.get("model_id")
+        if model_id:
+            idx = self.model_dropdown.findData(model_id)
+            if idx >= 0:
+                self.model_dropdown.setCurrentIndex(idx)
 
         self.trans_checkbox.setChecked(sm.get("enable_translation", False))
 

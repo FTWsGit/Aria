@@ -52,6 +52,8 @@ class App:
         self._pipeline: StreamingPipeline | LiveCaptionsPipeline | None = None
         self._tray: SystemTray | None = None
         self._is_running = False
+        self._creating = False
+        self._pending_stop = False
         self._last_settings: dict | None = None
         self._is_livecaptions_mode = False
         self._enable_translation = False
@@ -200,6 +202,9 @@ class App:
             self._stop()
             return
 
+        if self._creating:
+            return
+
         # Save settings for tray toggle
         self._last_settings = settings
         # Re-sync overlay visibility from persisted settings to avoid stale state.
@@ -243,6 +248,15 @@ class App:
                         self._signals,
                         lambda msg: self._signals.error.emit(msg),
                     )
+                    if self._pipeline is None:
+                        return  # error already emitted via on_error
+
+                if self._pending_stop:
+                    self._pipeline.stop()
+                    self._pipeline = None
+                    self._creating = False
+                    self._pending_stop = False
+                    return
 
                 self._pipeline.start()
                 self._signals.started.emit()
@@ -252,6 +266,7 @@ class App:
                 self._signals.error.emit("error_pipeline_startup")
 
         # Start pipeline in background thread
+        self._creating = True
         threading.Thread(target=create_pipeline, daemon=True).start()
 
         # Show loading state
@@ -259,6 +274,7 @@ class App:
 
     def _on_pipeline_started(self) -> None:
         """Called when pipeline has started."""
+        self._creating = False
         self._is_running = True
         self._console.set_running(True)
         self._console.set_status(t("status_running"))
@@ -324,6 +340,8 @@ class App:
     def _on_error(self, error: str) -> None:
         """Handle pipeline error."""
         self._is_running = False
+        self._creating = False
+        self._pending_stop = False
         self._stop_pipeline()
         self._console.set_running(False)
         display_msg = t(error)
@@ -335,6 +353,14 @@ class App:
     def _stop(self) -> None:
         """Stop the pipeline and overlay."""
         self._is_running = False
+
+        if self._creating:
+            self._pending_stop = True
+            self._console.set_running(False)
+            self._console.set_status(t("status_ready"))
+            if self._tray:
+                self._tray.update_status(False)
+            return
 
         self._stop_pipeline()
 

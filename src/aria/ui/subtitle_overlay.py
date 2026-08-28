@@ -6,6 +6,7 @@ A transparent, always-on-top, draggable window that displays subtitles.
 
 import sys
 from collections.abc import Callable
+from html import escape
 
 from PyQt6.QtCore import QPoint, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter
@@ -369,11 +370,11 @@ class SubtitleOverlay(FramelessWindowMixin, QWidget):
             html_parts = []
             if committed:
                 # White text for committed (stable)
-                escaped_committed = committed.replace("\n", "<br>")
+                escaped_committed = escape(committed).replace("\n", "<br>")
                 html_parts.append(f'<span style="color: white;">{escaped_committed}</span>')
             if draft:
                 # Green text for draft (in progress)
-                escaped_draft = draft.replace("\n", "<br>")
+                escaped_draft = escape(draft).replace("\n", "<br>")
                 html_parts.append(f'<span style="color: #90EE90;">{escaped_draft}</span>')
 
             if html_parts:

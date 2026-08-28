@@ -110,6 +110,7 @@ TRANSLATIONS = {
     "error_asr_backend_failed": "识别服务出现异常，已自动停止",
     "error_translation_unavailable": "翻译服务暂时不可用",
     "error_pipeline_startup": "启动识别服务失败，请检查配置",
+    "error_no_models_available": "没有可用的识别模型，请先在模型管理中下载",
     "model_required_download_title": "模型未下载",
     "model_required_download_msg": "模型 '{model_id}' 尚未下载。\n请先在模型管理中下载。",
     # Tray menu
