@@ -71,8 +71,7 @@ class AudioCapture:
             ):
                 return device
 
-        # Fallback: return default output with loopback flag
-        return default_output
+        raise RuntimeError("No WASAPI loopback device available for the default output.")
 
     @classmethod
     def list_microphone_devices(cls) -> list[dict]:
