@@ -1,9 +1,9 @@
 from aria.segmenter import PlainSentenceSegmenter, segment_sentences
 
-
 # ---------------------------------------------------------------------------
 # segment_sentences 单元测试
 # ---------------------------------------------------------------------------
+
 
 def test_segment_sentences_basic():
     """句号、问号、感叹号结尾触发分段。"""
@@ -74,6 +74,7 @@ def test_segment_sentences_last_sentence_kept():
 # ---------------------------------------------------------------------------
 # PlainSentenceSegmenter 单元测试
 # ---------------------------------------------------------------------------
+
 
 def test_segmenter_process_basic_commit():
     """6句输入 → 达到阈值，提交4句，pending_draft 返回全部6句草稿。"""
@@ -161,7 +162,5 @@ def test_segmenter_only_commits_new():
     # 同样的文本不变 → 不提交
     assert seg.process_text("一。二。三。四。五。六。") is None
     # 追加到10句，_committed_count=4，draft=sentences[4:]=6句 → 触发提交
-    committed = seg.process_text(
-        "一。二。三。四。五。六。七。八。九。十。"
-    )
+    committed = seg.process_text("一。二。三。四。五。六。七。八。九。十。")
     assert committed == "五 六 七 八"

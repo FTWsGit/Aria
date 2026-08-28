@@ -1,6 +1,6 @@
 [project]
 name = "aria-subtitles"
-version = "1.0.0"
+version = "2.0.1"
 description = "ARIA - AI Realtime Intelligent Audio | Universal Real-time AI Subtitles"
 license = { text = "GPL-3.0" }
 requires-python = ">=3.10"
@@ -28,9 +28,8 @@ dependencies = [
     "openai>=1.0.0",
     "pyyaml>=6.0",
     "huggingface_hub>=0.20.0",
-    "requests>=2.28.0",
     # LiveCaptions mode dependencies
-    "pywinauto>=0.6.8",
+    "pywin32>=306",
     "uiautomation>=2.0.0",
     "comtypes>=1.2.0",
     "pyautogui>=0.9.53",
@@ -63,7 +62,7 @@ packages = ["src/aria"]
 target-version = "py311"
 line-length = 120 
 
-include = ["src/**/*.py"]
+include = ["src/**/*.py", "tests/**/*.py"]
 
 [tool.ruff.lint]
 select = [

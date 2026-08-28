@@ -10,6 +10,7 @@ def fake_translator(text: str) -> str:
 # Existing tests (renamed)
 # ---------------------------------------------------------------------------
 
+
 def test_single_word_no_commit():
     """A single word is too short to trigger a commit."""
     manager = TranslationStateManager(translator=fake_translator)
@@ -30,6 +31,7 @@ def test_state_manager_reset():
 # ---------------------------------------------------------------------------
 # New tests
 # ---------------------------------------------------------------------------
+
 
 def test_commit_mechanism():
     """Feed 6 sentences: DRAFT_COMMIT_THRESHOLD triggers, COMMIT_COUNT=4 committed."""
@@ -60,13 +62,12 @@ def test_draft_accumulation():
     )
     state2 = manager.process_text(text2)
     # Committed should now have 2 paragraphs (4 + 4 sentences)
-    assert "\n" in state2.committed_text, (
-        "Expected at least 2 commit paragraphs, got: %r" % state2.committed_text
-    )
+    assert "\n" in state2.committed_text, f"Expected at least 2 commit paragraphs, got: {state2.committed_text!r}"
 
 
 def test_translator_exception():
     """Translator that raises → _draft_translation is empty, committed stays empty."""
+
     def failing_translator(_text: str) -> str:
         raise Exception("Simulated translator failure")
 
@@ -111,7 +112,7 @@ def test_retranslate_committed():
     manager.process_text("Completely different text. Nothing matches before.")
     # _committed_sources should be trimmed (decreased or cleared)
     assert len(manager._committed_sources) == 0, (
-        "Expected committed sources to be cleared, got %d" % len(manager._committed_sources)
+        f"Expected committed sources to be cleared, got {len(manager._committed_sources)}"
     )
     assert manager._committed_paragraphs == []
 
@@ -138,6 +139,4 @@ def test_max_draft_sentences_skip():
     manager.process_text(text)
 
     # After MAX_DRAFT_SENTENCES skip + commit, draft should be ≤ 8
-    assert len(manager._draft_sources) <= 8, (
-        "Expected draft ≤ 8, got %d" % len(manager._draft_sources)
-    )
+    assert len(manager._draft_sources) <= 8, f"Expected draft <= 8, got {len(manager._draft_sources)}"

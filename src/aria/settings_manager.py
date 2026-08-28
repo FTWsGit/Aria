@@ -12,7 +12,6 @@ from .logger import debug, error, info, warning
 # 设置项索引（全仓库实际使用的 key）
 # === 已登记（在 DEFAULT_SETTINGS 中有默认值） ===
 #   mode              — 识别模式 (asr / livecaptions)
-#   min_duration      — 最小显示时长 (ms)
 #   enable_translation — 是否启用翻译
 #   translation_engine — 翻译引擎 (bing / google_free / openai / youdao)
 #   target_language   — 目标语言代码
@@ -46,7 +45,6 @@ class SettingsManager:
 
     DEFAULT_SETTINGS = {
         "mode": "asr",
-        "min_duration": 100,
         "enable_translation": True,
         "translation_engine": "bing",
         "target_language": "zho_Hans",

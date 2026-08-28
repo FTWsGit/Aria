@@ -16,7 +16,6 @@ _logger = None
 _log_verbosity = "verbose"  # verbose | simple
 _simple_logger = None
 _simple_file_handler = None
-_simple_log_mode = "session"
 
 
 # Rotating log limits
@@ -225,13 +224,6 @@ def start_simple_log_session() -> Path:
     _simple_file_handler = _build_simple_handler(simple_path)
     _simple_logger.addHandler(_simple_file_handler)
     return simple_path
-
-
-def set_simple_log_mode(mode: str) -> None:
-    """Set simple log mode."""
-    global _simple_log_mode
-    if mode == "session":
-        _simple_log_mode = mode
 
 
 def set_transcript_source(ts_path: str | None) -> None:
