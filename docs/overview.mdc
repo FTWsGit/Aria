@@ -27,7 +27,7 @@ Windows 桌面应用，捕获系统音频或麦克风输入，在 PyQt6 悬浮�
 | `src/aria/livecaptions/` | Windows 内建字幕集成 |
 | `src/aria/model_manager/` | 模型注册表 + 下载 + 配置 |
 | `src/aria/pipeline.py` | 多后端流式管道 |
-| `src/aria/segmenter.py` | 句子分段（标点启发式），供翻译和转录日志使用 |
+| `src/aria/segmenter.py` | 句子分段与 commit 阈值判断（标点启发式），供翻译和转录日志使用 |
 | `src/aria/settings_manager.py` | JSON 持久化设置 |
 | `src/aria/logger.py` | 应用日志和转录日志 |
 | `models/` | ASR 模型 YAML 配置（git 跟踪） |
