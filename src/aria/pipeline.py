@@ -286,7 +286,7 @@ class StreamingPipeline(BasePipeline):
                 raw_text = self._latest_raw_text
                 self._new_text_event.clear()
 
-            if not raw_text or not self._translation_layer.is_active:
+            if not raw_text or not self._translation_layer.is_ready:
                 continue
 
             try:
@@ -349,7 +349,7 @@ class StreamingPipeline(BasePipeline):
             )
             self._process_thread.start()
 
-            if self._translation_layer.is_active:
+            if self._translation_layer.is_ready:
                 self._translation_thread = threading.Thread(
                     target=self._translation_loop, daemon=True, name="StreamingPipeline_Translation"
                 )

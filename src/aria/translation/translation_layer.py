@@ -149,11 +149,6 @@ class TranslationLayer:
         return self._state_manager is not None
 
     @property
-    def is_active(self) -> bool:
-        """Deprecated alias for is_ready."""
-        return self.is_ready
-
-    @property
     def target_language(self) -> str | None:
         """Target language code from the translator, or None."""
         if self._translator:
