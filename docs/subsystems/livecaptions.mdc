@@ -36,9 +36,10 @@ backend —— 这也是它需要 `controller.py`（启动/摆放窗口，对应
 
 ## 依赖
 
-- `pywinauto` / `uiautomation`：UI Automation
+- `uiautomation`：UI Automation
 - `pyautogui`：模拟按键启动 Live Captions
 - `comtypes`：COM 互操作
+- `pywin32`：win32gui/win32con/win32api 窗口操作
 
 ## 不变式
 

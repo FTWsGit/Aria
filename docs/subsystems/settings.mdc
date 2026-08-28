@@ -22,14 +22,13 @@ Windows 实际路径：`C:\Users\<用户名>\.config\aria\settings.json`（代�
 ```python
 DEFAULT_SETTINGS = {
     "mode": "asr",
-    "min_duration": 100,
     "enable_translation": True,
     "translation_engine": "bing",
     "target_language": "zho_Hans",
     "audio_source": "system",
     "timezone": "system",
     "overlay_visible": True,
-    "console_mode": "verbose",
+    "log_verbosity": "verbose",
     "openai_endpoint": "http://127.0.0.1:1234/v1",
     "openai_api_key": "",
     "openai_model_name": "",
