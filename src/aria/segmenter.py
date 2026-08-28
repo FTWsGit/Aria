@@ -23,6 +23,18 @@ COMMIT_COUNT = 4
 DRAFT_CHAR_THRESHOLD = 150
 
 
+def compute_commit_target(draft_sources: list[str]) -> int | None:
+    """Decide whether and how many draft sentences to commit.
+
+    Returns the commit count (>=1) or ``None`` if thresholds are not met.
+    """
+    total = len(draft_sources)
+    char_len = sum(len(s) for s in draft_sources)
+    if total < DRAFT_COMMIT_THRESHOLD and char_len < DRAFT_CHAR_THRESHOLD:
+        return None
+    return COMMIT_COUNT if total >= COMMIT_COUNT else max(1, total - 1)
+
+
 def segment_sentences(text: str) -> list[str]:
     """Split text into sentences, force-splitting overly long ones."""
     if not text:
@@ -69,12 +81,10 @@ class PlainSentenceSegmenter:
 
         self._draft_sources = sentences[self._committed_count :]
 
-        total = len(self._draft_sources)
-        char_len = sum(len(s) for s in self._draft_sources)
-        if total < DRAFT_COMMIT_THRESHOLD and char_len < DRAFT_CHAR_THRESHOLD:
+        commit_target = compute_commit_target(self._draft_sources)
+        if commit_target is None:
             return None
 
-        commit_target = COMMIT_COUNT if total >= COMMIT_COUNT else max(1, total - 1)
         to_commit = self._draft_sources[:commit_target]
         self._committed_count += len(to_commit)
         return " ".join(to_commit)

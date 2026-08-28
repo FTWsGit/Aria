@@ -29,7 +29,13 @@ except ImportError:
 
 
 try:
-    from ..segmenter import COMMIT_COUNT, DRAFT_CHAR_THRESHOLD, DRAFT_COMMIT_THRESHOLD
+    from ..segmenter import (
+        COMMIT_COUNT,
+        DRAFT_CHAR_THRESHOLD,
+        DRAFT_COMMIT_THRESHOLD,
+        compute_commit_target,
+        segment_sentences,
+    )
     from ..segmenter import MAX_SENTENCE_LENGTH as _MAX_SENTENCE_LENGTH
     from ..segmenter import SENTENCE_DELIMITERS as _SENTENCE_DELIMITERS
 except ImportError:
@@ -39,6 +45,31 @@ except ImportError:
     DRAFT_COMMIT_THRESHOLD = 6
     COMMIT_COUNT = 4
     DRAFT_CHAR_THRESHOLD = 150
+
+    def segment_sentences(text):
+        if not text:
+            return []
+        parts = re.split(_SENTENCE_DELIMITERS, text)
+        sentences = []
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            if len(part) > _MAX_SENTENCE_LENGTH:
+                for i in range(0, len(part), _MAX_SENTENCE_LENGTH):
+                    chunk = part[i : i + _MAX_SENTENCE_LENGTH].strip()
+                    if chunk:
+                        sentences.append(chunk)
+            else:
+                sentences.append(part)
+        return sentences
+
+    def compute_commit_target(draft_sources):
+        total = len(draft_sources)
+        char_len = sum(len(s) for s in draft_sources)
+        if total < DRAFT_COMMIT_THRESHOLD and char_len < DRAFT_CHAR_THRESHOLD:
+            return None
+        return COMMIT_COUNT if total >= COMMIT_COUNT else max(1, total - 1)
 
 
 @dataclass
@@ -63,14 +94,8 @@ class TranslationStateManager:
     4. When draft has enough source sentences, promote them to committed.
     """
 
-    # Sentence delimiters for segmentation (shared with segmenter.py)
-    SENTENCE_DELIMITERS = _SENTENCE_DELIMITERS
-    MAX_SENTENCE_LENGTH = _MAX_SENTENCE_LENGTH
-
     # Buffer thresholds (imported from segmenter.py)
     DRAFT_COMMIT_THRESHOLD = DRAFT_COMMIT_THRESHOLD
-    COMMIT_COUNT = COMMIT_COUNT
-    DRAFT_CHAR_THRESHOLD = DRAFT_CHAR_THRESHOLD
 
     # Fuzzy matching threshold
     FUZZY_THRESHOLD = 0.65  # 65% similarity = match (Lowered for stability)
@@ -128,7 +153,7 @@ class TranslationStateManager:
             return self._build_state()
 
         # Segment into sentences
-        source_sentences = self._segment_sentences(full_source_text)
+        source_sentences = segment_sentences(full_source_text)
 
         if not source_sentences:
             return self._build_state()
@@ -178,31 +203,6 @@ class TranslationStateManager:
         self._check_commit_threshold()
 
         return self._build_state()
-
-    def _segment_sentences(self, text: str) -> list[str]:
-        """Split text into sentences."""
-        if not text:
-            return []
-
-        # Split by sentence delimiters
-        parts = re.split(self.SENTENCE_DELIMITERS, text)
-
-        sentences = []
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-
-            # If part is too long, split by length
-            if len(part) > self.MAX_SENTENCE_LENGTH:
-                for i in range(0, len(part), self.MAX_SENTENCE_LENGTH):
-                    chunk = part[i : i + self.MAX_SENTENCE_LENGTH].strip()
-                    if chunk:
-                        sentences.append(chunk)
-            else:
-                sentences.append(part)
-
-        return sentences
 
     def _find_committed_end(self, source_sentences: list[str]) -> int:
         """Find where committed content ends in source sentences (read-only)."""
@@ -256,53 +256,40 @@ class TranslationStateManager:
 
     def _check_commit_threshold(self) -> None:
         """Check if draft should be partially committed."""
-        total_draft_sources = len(self._draft_sources)
-        draft_char_length = sum(len(s) for s in self._draft_sources)
+        commit_target = compute_commit_target(self._draft_sources)
+        if commit_target is None:
+            return
 
-        # Trigger if:
-        # 1. Enough sentences accumulated (standard case)
-        # 2. OR draft is getting too long (run-on sentence protection)
-        should_commit = (
-            total_draft_sources >= self.DRAFT_COMMIT_THRESHOLD or draft_char_length >= self.DRAFT_CHAR_THRESHOLD
-        )
+        to_commit = self._draft_sources[:commit_target]
+        batch_text = " ".join(to_commit)
 
-        if should_commit:
-            # Determine how many to commit
-            # If triggered by length but count is low, commit fewer but at least 1
-            commit_target = self.COMMIT_COUNT
-            if total_draft_sources < self.COMMIT_COUNT:
-                commit_target = max(1, total_draft_sources - 1)  # Leave 1 if possible
+        # Add to committed sources
+        self._committed_sources.extend(to_commit)
 
-            to_commit = self._draft_sources[:commit_target]
-            batch_text = " ".join(to_commit)
+        # Translate the newly committed batch and add as a NEW PARAGRAPH
+        batch_translation = ""
+        if self.translator:
+            try:
+                batch_translation = self.translator(batch_text) or ""
+                if batch_translation:
+                    self._committed_paragraphs.append(batch_translation)
+            except Exception as e:
+                warning(f"TSM: Commit translation error: {e}")
 
-            # Add to committed sources
-            self._committed_sources.extend(to_commit)
+        self._last_committed_batch = (batch_text, batch_translation)
 
-            # Translate the newly committed batch and add as a NEW PARAGRAPH
-            batch_translation = ""
-            if self.translator:
-                try:
-                    batch_translation = self.translator(batch_text) or ""
-                    if batch_translation:
-                        self._committed_paragraphs.append(batch_translation)
-                except Exception as e:
-                    warning(f"TSM: Commit translation error: {e}")
+        # Remove from draft
+        self._draft_sources = self._draft_sources[commit_target:]
 
-            self._last_committed_batch = (batch_text, batch_translation)
-
-            # Remove from draft
-            self._draft_sources = self._draft_sources[commit_target:]
-
-            # Re-translate remaining draft
-            if self._draft_sources and self.translator:
-                try:
-                    draft_text = " ".join(self._draft_sources)
-                    self._draft_translation = self.translator(draft_text) or ""
-                except Exception as e:
-                    warning(f"TSM: Draft re-translation error: {e}")
-            else:
-                self._draft_translation = ""
+        # Re-translate remaining draft
+        if self._draft_sources and self.translator:
+            try:
+                draft_text = " ".join(self._draft_sources)
+                self._draft_translation = self.translator(draft_text) or ""
+            except Exception as e:
+                warning(f"TSM: Draft re-translation error: {e}")
+        else:
+            self._draft_translation = ""
 
     def _build_state(self) -> TranslationState:
         """Build the current translation state for display."""
