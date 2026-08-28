@@ -241,12 +241,16 @@ class StreamingPipeline(BasePipeline):
             if not raw_text or raw_text == self._latest_raw_text:
                 continue
 
+            # Compute incremental text for logging (O(n) instead of O(n²))
+            prev = self._latest_raw_text
+            incremental_text = raw_text[len(prev) :] if prev and raw_text.startswith(prev) else raw_text
+
             # Update latest text safely
             with self._text_lock:
                 self._latest_raw_text = raw_text
                 self._new_text_event.set()  # Signal translation thread
 
-            transcript(raw_text)
+            transcript(incremental_text)
 
             # If no translation, emit immediately
             if not self._translation_layer.is_ready:
@@ -287,10 +291,6 @@ class StreamingPipeline(BasePipeline):
 
             try:
                 result = self._translation_layer.process_text(raw_text)
-                if result.committed_text:
-                    transcript(result.committed_text)
-                if result.draft_text:
-                    transcript(result.draft_text)
 
                 event = SubtitleEvent(
                     text=raw_text,
@@ -305,6 +305,7 @@ class StreamingPipeline(BasePipeline):
                 self.on_subtitle(event)
 
                 if result.batch:
+                    transcript(result.batch[0])
                     self._translation_layer.emit_message(result.batch[0], result.batch[1])
 
                 # Reset failure counter on success
