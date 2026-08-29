@@ -229,6 +229,7 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
             settings["vad_min_speech_duration"] = self.vad_min_speech_spin.value()
             settings["vad_max_speech_duration"] = self.vad_max_speech_spin.value()
             settings["vad_split_by_punctuation"] = self.vad_split_punctuation_check.isChecked()
+            settings["vad_advanced_expanded"] = self.vad_advanced_group.isChecked()
 
         self._save_settings(settings)
 
@@ -315,4 +316,5 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
         self.vad_min_speech_spin.setValue(sm.get("vad_min_speech_duration", 0.25))
         self.vad_max_speech_spin.setValue(sm.get("vad_max_speech_duration", 20.0))
         self.vad_split_punctuation_check.setChecked(sm.get("vad_split_by_punctuation", True))
+        self.vad_advanced_group.setChecked(sm.get("vad_advanced_expanded", False))
         self._update_vad_controls_visibility()

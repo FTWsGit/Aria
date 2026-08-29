@@ -26,6 +26,7 @@ from .logger import debug, error, info, warning
 #   openai_max_tokens — OpenAI 最大 token 数
 #   openai_system_prompt — OpenAI 系统提示词
 #   ui_language       — UI 语言代码
+#   vad_advanced_expanded — VAD 高级参数组展开状态
 #
 # === 未登记（在各处用 .get() 兜底，无 DEFAULT_SETTINGS 条目） ===
 #   model_id          — ASR 模型 ID（settings_window.py / app.py）
@@ -66,6 +67,7 @@ class SettingsManager:
         "vad_min_speech_duration": 0.25,
         "vad_max_speech_duration": 20.0,
         "vad_split_by_punctuation": True,
+        "vad_advanced_expanded": False,
     }
 
     def __init__(self):

@@ -43,6 +43,7 @@ DEFAULT_SETTINGS = {
     "vad_min_speech_duration": 0.25,
     "vad_max_speech_duration": 20.0,
     "vad_split_by_punctuation": True,
+    "vad_advanced_expanded": False,
 }
 ```
 
