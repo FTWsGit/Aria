@@ -14,6 +14,7 @@ from .logger import debug, error, info, warning
 #   mode              — 识别模式 (asr / livecaptions)
 #   enable_translation — 是否启用翻译
 #   translation_engine — 翻译引擎 (bing / google_free / openai / youdao)
+#   translation_context_sentences — 翻译时携带的上下文句数 (0-5，0 关闭)
 #   target_language   — 目标语言代码
 #   audio_source      — 音频源 (system / microphone)
 #   timezone          — 时区
@@ -48,6 +49,7 @@ class SettingsManager:
         "mode": "asr",
         "enable_translation": True,
         "translation_engine": "bing",
+        "translation_context_sentences": 2,
         "target_language": "zho_Hans",
         "audio_source": "system",
         "timezone": "system",

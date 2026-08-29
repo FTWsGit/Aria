@@ -38,6 +38,17 @@ VAD_BACKENDS = {
     "sherpa_onnx": SherpaOnnxVadBackend,
 }
 
+# VAD params owned by Settings/UI: the settings dict is their only live source,
+# so yaml params must not supply these keys (a value there would be silently
+# ignored). These values are code-level fallbacks matching the UI defaults and
+# apply when a caller passes no vad_overrides.
+VAD_UI_OWNED_PARAMS: dict[str, float] = {
+    "threshold": 0.5,
+    "min_silence_duration": 0.5,
+    "min_speech_duration": 0.25,
+    "max_speech_duration": 20.0,
+}
+
 
 class BasePipeline(ABC):
     """Shared pipeline lifecycle for ASR / LiveCaptions pipelines."""
@@ -73,6 +84,7 @@ class BasePipeline(ABC):
         target_language: str,
         openai_config: OpenAIConfig | None,
         on_message: Callable[[TranscriptMessage], None] | None,
+        context_sentences: int = 0,
     ) -> TranslationLayer:
         """Build a TranslationLayer from the pipeline's translation settings.
 
@@ -85,6 +97,7 @@ class BasePipeline(ABC):
             target_language=target_language,
             openai_config=openai_config or OpenAIConfig(),
             on_message=on_message,
+            context_sentences=context_sentences,
         )
 
 
@@ -114,6 +127,7 @@ class StreamingPipeline(BasePipeline):
         translation_engine: str = "google",
         target_language: str = "zh",
         audio_source: str = "system",
+        translation_context_sentences: int = 0,
         # OpenAI translator settings
         openai_config: OpenAIConfig | None = None,
         # VAD settings
@@ -135,6 +149,8 @@ class StreamingPipeline(BasePipeline):
             translation_engine: "google", "bing", "youdao", or "openai"
             target_language: Target language for translation
             audio_source: "system" or "mic:..." for microphone
+            translation_context_sentences: Previously committed source
+                sentences passed as translation context (0 disables)
         """
         super().__init__(on_subtitle=on_subtitle)
         self._on_error = on_error
@@ -174,7 +190,10 @@ class StreamingPipeline(BasePipeline):
                     raise RuntimeError(f"VAD model '{vad_model_id}' not downloaded")
                 vad_backend_cls = VAD_BACKENDS[vad_spec.backend]
                 merged = {
-                    **vad_spec.params,
+                    # UI-owned keys are excluded so yaml cannot shadow the
+                    # Settings/UI values; fallback covers absent overrides.
+                    **{k: v for k, v in vad_spec.params.items() if k not in VAD_UI_OWNED_PARAMS},
+                    **VAD_UI_OWNED_PARAMS,
                     **{k: v for k, v in (vad_overrides or {}).items() if v is not None},
                 }
                 self._vad_gate = VadGate(vad_backend_cls(vad_spec, vad_root, params=merged))
@@ -191,6 +210,7 @@ class StreamingPipeline(BasePipeline):
             target_language=target_language,
             openai_config=openai_config,
             on_message=on_message,
+            context_sentences=translation_context_sentences,
         )
 
         # Audio capture

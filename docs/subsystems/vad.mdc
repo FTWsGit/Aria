@@ -20,7 +20,16 @@ alwaysApply: false
 - 帧对齐：`AudioCapture` 按 100ms（1600 samples）出块，VAD 窗口是 512（silero）或 256（ten），余数跨 `feed()` 调用保留
 - 增量提取：`current_segment` 是自段起点累积的样本，不能整段重复喂给流式识别器，`VadGate` 只吐出自上次调用以来的新增尾部；段结束（含 max_speech_duration 强制切分）时 delivered 计数先归零再取增量，保证新段从 sample 0 开始
 
-`SherpaOnnxVadBackend` 的关键行为：构造前检查模型文件存在（sherpa 构造失败时不抛 Python 异常只打 stderr）；`front.samples` 在 `pop` 前立即拷贝（`front` 是引用，下次调用任何方法即失效）；调参（threshold/min_silence 等）来自 pipeline 传入的合并 params，不直接 mutate registry 里共享的 `spec.params`。sherpa 1.13.x 的 silero VAD 不执行 `max_speech_duration`（配置字段存在但实现忽略），backend 自行强制切分：活跃样本计数达阈值时拷贝当前段并 reset 检测器，把切分作为已完成段交付，连续语音在 min_speech 重新武装后形成新段；`max_speech_duration=0` 关闭该行为。
+`SherpaOnnxVadBackend` 的关键行为：构造前检查模型文件存在（sherpa 构造失败时不抛 Python 异常只打 stderr）；`front.samples` 在 `pop` 前立即拷贝（`front` 是引用，下次调用任何方法即失效）；调参（threshold/min_silence 等）来自 pipeline 传入的合并 params（来源规则见「参数来源与优先级」），不直接 mutate registry 里共享的 `spec.params`。sherpa 1.13.x 的 silero VAD 不执行 `max_speech_duration`（配置字段存在但实现忽略），backend 自行强制切分：活跃样本计数达阈值时拷贝当前段并 reset 检测器，把切分作为已完成段交付，连续语音在 min_speech 重新武装后形成新段；`max_speech_duration=0` 关闭该行为。
+
+## 参数来源与优先级
+
+VAD 调参参数按归属分两类：
+
+- **UI-owned**（threshold、min_silence_duration、min_speech_duration、max_speech_duration）：Settings/UI 是唯一实时来源，经 `vad_overrides` 传入 pipeline；无 overrides 时由代码级 fallback 常量 `VAD_UI_OWNED_PARAMS`（`pipeline.py`，值与 UI 默认一致）兜底。yaml `params` 不得供这几个键——Settings 恒定产出具体值，yaml 同名键会被静默忽略，pipeline 合并时显式排除
+- **yaml-only**（model_family、num_threads、provider）：无 UI 控件的字段，只能从 yaml `params` 供值
+
+规则：凡有 Settings/UI 控件的参数以 UI 为准；yaml `params` 只能为无 UI 控件的字段供值，不得用于覆盖 UI 已拥有的参数。
 
 ## 与 ASR/翻译的关系
 

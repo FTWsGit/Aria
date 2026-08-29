@@ -11,8 +11,7 @@ __pycache__/
 # logs
 logs/
 
-# models
-models/
+# models: model yaml templates are tracked; only downloaded weights are ignored
 models_cache/
 
 # agent

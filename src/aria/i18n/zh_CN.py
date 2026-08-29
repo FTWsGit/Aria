@@ -19,6 +19,7 @@ TRANSLATIONS = {
     "translation": "翻译",
     "engine": "引擎",
     "target_lang": "译文",
+    "translation_context_label": "上下文句数 (0=关闭)",
     "engine_google": "Google 云端",
     # Model settings
     "model_settings": "模型设置",

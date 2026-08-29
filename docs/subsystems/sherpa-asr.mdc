@@ -17,7 +17,7 @@ alwaysApply: false
 
 - `spec.raw["recognizer_factory"]` 决定使用哪个 `sherpa_onnx.OnlineRecognizer.from_*` 工厂方法（如 `from_transducer`、`from_paraformer`、`from_whisper`）
 - `spec.raw["files"]` 定义文件相对路径，由 `model_root` 解析为绝对路径
-- `spec.params` 提供 `num_threads`、`feature_dim`、`decoding_method` 等运行时参数
+- 其余 kwargs 来自 `spec.params`，按归属分两类：结构性配置（`feature_dim` 等模型固有值，yaml 供值，不应随手改）与调参旋钮（`num_threads`、`decoding_method`，yaml-only，未来可选进 UI）；有 UI 控件的参数以 UI 为准（见「模型管理」）
 
 实现 `StreamingASR` Protocol：
 - `process_audio(audio: np.ndarray) -> str`：输入 float32 16kHz 音频，返回累计识别文本

@@ -116,6 +116,7 @@ class TranslatorsLibWrapper:
     def translate(
         self,
         text: str,
+        context: list[str] | None = None,
         source_language: str | None = None,
         target_language: str | None = None,
     ) -> str:
@@ -124,6 +125,9 @@ class TranslatorsLibWrapper:
 
         Args:
             text: Text to translate
+            context: Accepted for translator-interface uniformity, ignored:
+                web-scraping engines carry no conversational state, each
+                request is translated verbatim in isolation
             source_language: Source language code (optional, auto-detect)
             target_language: Target language code (overrides default)
 

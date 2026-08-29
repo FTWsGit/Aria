@@ -84,6 +84,14 @@ class TranslationTabMixin:
         self.target_lang_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
         grid.addWidget(self.target_lang_dropdown, 2, 1)
 
+        # Context sentences (0 disables context-aware translation)
+        grid.addWidget(QLabel(t("translation_context_label") + ":"), 3, 0)
+        self.translation_context_spin = QSpinBox()
+        self.translation_context_spin.setRange(0, 5)
+        self.translation_context_spin.setValue(2)
+        self.translation_context_spin.valueChanged.connect(lambda _: self._persist_ui_settings())
+        grid.addWidget(self.translation_context_spin, 3, 1)
+
         layout.addLayout(grid)
         layout.addStretch(1)
 

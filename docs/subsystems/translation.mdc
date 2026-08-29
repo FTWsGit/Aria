@@ -48,6 +48,15 @@ result = translator.translate("hello")
 
 VAD 开启时 pipeline 走 `process_committed_sentence(text)`：每句翻译恰一次，无模糊匹配、无 draft，恒返回 batch，不调用 TranslationStateManager。见「语音活动检测」。
 
+## 上下文感知翻译
+
+设置项 `translation_context_sentences`（int，0–5，默认 2）：翻译当前句时，把它之前最近 N 句**已提交源句**（非译文）作为 context 一并传给引擎，让引擎（尤其 OpenAI 兼容 LLM）保持术语、代词与文风连贯。0 = 完全禁用，恒不带 context，行为与无此机制时完全一致。
+
+- 引擎接口：所有 translator 的 `translate(text, context=None)` 统一签名，context=None 时与单参数调用完全等价。`OpenAITranslator` 把 context 作为额外的 system 消息注入，并明确告知模型仅供理解、不要翻译或输出；`TranslatorsLibWrapper`（网页抓取引擎）接受 context 但忽略——每次请求孤立翻译，无会话状态可用。
+- VAD 路径：滚动窗口由 `TranslationLayer` 自己维护（独立于 pipeline 显示用的 `_vad_committed_sources`，后者是显示块用途）。`process_committed_sentence` 先取窗口快照作为 context，翻译完成后才把当前句追加进窗口，因此当前句不会出现在自己的 context 里。
+- Legacy 路径（非 VAD，含 Live Captions）：`TranslationStateManager` 以自身 `_committed_sources[-N:]` 作为 context，注入 draft 翻译、commit 批量翻译（快照取自 extend 之前）与 commit 后的 draft 重译；`_retranslate_committed` 重译的是全部已提交句（即完整历史），无更早上下文可带，传 None。
+- 窗口随 `TranslationLayer.reset()` 清空。StreamingPipeline/LiveCaptionsPipeline 每次启动都由 app.py 经 PipelineFactory 新建，TranslationLayer 不跨 session 存活；两条 pipeline 的 `start()` 也都会调用 `reset()`，窗口天然干净。
+
 ## 依赖
 
 - `openai`：OpenAI-compatible HTTP client

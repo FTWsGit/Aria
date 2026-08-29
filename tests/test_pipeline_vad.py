@@ -833,3 +833,69 @@ def test_vad_source_rolling_window(monkeypatch, tmp_path):
     assert "sentence one" not in last_final.text, f"Oldest should roll out: {last_final.text}"
     assert "sentence two" in last_final.text, f"Expected 'sentence two': {last_final.text}"
     assert "sentence three" in last_final.text, f"Expected 'sentence three': {last_final.text}"
+
+
+# ---------------------------------------------------------------------------
+# Test 10: VAD params priority — Settings/UI over yaml
+# ---------------------------------------------------------------------------
+
+
+def test_vad_params_ui_owned_keys_ignore_yaml(monkeypatch, tmp_path):
+    """UI-owned VAD params come from vad_overrides (Settings/UI) with
+    code-level fallbacks; yaml params carrying the same keys are ignored.
+
+    Settings always produce concrete values for these keys, so without the
+    exclusion a yaml value for them could never take effect. Non-UI keys
+    (model_family etc.) still pass through from yaml.
+    """
+    captured: dict = {}
+
+    def fake_backend_factory(spec, root, **kw):
+        captured.update(kw["params"])
+        return FakeVADBackend(frame_size=512)
+
+    monkeypatch.setitem(pipeline_mod.VAD_BACKENDS, "fake", fake_backend_factory)
+    monkeypatch.setitem(pipeline_mod.STREAMING_BACKENDS, "fake", lambda spec, root: FakeStreamingTranscriber())
+    monkeypatch.setattr(pipeline_mod, "AudioCapture", lambda source=None, **kw: FakeAudioCapture())
+
+    vad_yaml = _make_vad_yaml(model_id="vad-test", backend="fake")
+    # Simulate a yaml that still carries UI-owned keys: they must be ignored.
+    vad_yaml["params"].update(
+        {
+            "threshold": 0.99,
+            "min_silence_duration": 9.9,
+            "min_speech_duration": 9.9,
+            "max_speech_duration": 99.0,
+        }
+    )
+    registry, manager = _make_registry_and_manager(tmp_path, [_make_asr_streaming_yaml(), vad_yaml])
+
+    # No overrides: UI-owned keys fall back to the UI-default constants
+    pipeline_mod.StreamingPipeline(
+        model_id="test-streaming",
+        registry=registry,
+        model_manager=manager,
+        enable_translation=False,
+        enable_vad=True,
+        vad_model_id="vad-test",
+    )
+    assert captured["threshold"] == 0.5
+    assert captured["min_silence_duration"] == 0.5
+    assert captured["min_speech_duration"] == 0.25
+    assert captured["max_speech_duration"] == 20.0
+    # Non-UI keys still come from yaml
+    assert captured["model_family"] == "silero"
+
+    # Overrides (the Settings/UI path) win over both yaml and fallback;
+    # None-valued entries do not shadow the fallback
+    pipeline_mod.StreamingPipeline(
+        model_id="test-streaming",
+        registry=registry,
+        model_manager=manager,
+        enable_translation=False,
+        enable_vad=True,
+        vad_model_id="vad-test",
+        vad_overrides={"threshold": 0.8, "min_silence_duration": None},
+    )
+    assert captured["threshold"] == 0.8
+    assert captured["min_silence_duration"] == 0.5

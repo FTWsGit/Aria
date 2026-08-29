@@ -23,8 +23,17 @@ alwaysApply: false
 
 | 目录 | 内容 | git |
 |---|---|---|
-| `models/` | yaml 配置文件 | 跟踪 |
-| `models_cache/<model_id>/` | 下载的权重文件 | gitignore |
+| `models/` | yaml 配置文件（随仓库分发的模型清单，registry 依赖它建 ModelSpec） | 跟踪 |
+| `models_cache/<model_id>/` | 下载的权重文件（机器本地缓存） | gitignore |
+
+## 参数职责边界（yaml vs Settings/UI）
+
+凡有 Settings/UI 控件的参数以 UI 为准；yaml `params`/`raw` 只能为无 UI 控件的字段供值，不得用于覆盖 UI 已拥有的参数。UI-owned 键在 pipeline 合并时从 yaml params 中显式排除（如 VAD 的 threshold/min_silence_duration/min_speech_duration/max_speech_duration，见「语音活动检测」）。
+
+ASR 侧（`_build_sherpa_kwargs`）字段的归属：
+
+- 结构性参数（模型/架构固有，不应随手改，yaml 供值）：`recognizer_factory`、`files`、`feature_dim`——改动等于换模型或破坏识别，不是调参
+- 调参旋钮（yaml-only，未来可选进 UI）：`num_threads`、`decoding_method`——不改变识别结果内容，只影响性能/解码策略权衡，无会话内调节场景，进 UI 的收益不抵设置面板噪音，故暂留 yaml
 
 ## 下载方式
 
@@ -48,7 +57,8 @@ alwaysApply: false
 
 ## 关键事实
 
-- 模型配置（yaml）放在 `models/`，权重放在 `models_cache/`
+- 模型配置（yaml）放在 `models/`（git 跟踪），权重放在 `models_cache/`（gitignore）
+- 应用零 yaml 无法工作：`ModelRegistry` 扫 `models/` 建 ModelSpec，yaml 是随仓库分发的模板/清单，不是本地产物
 - 不自动下载任何模型——下载必须由用户在 Model Manager 中点击触发
 - `StreamingPipeline` 启动前调用 `is_downloaded()` 检查，未下载则抛错
 - 翻译模型不再由 Aria 管理

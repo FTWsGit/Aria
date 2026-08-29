@@ -1,0 +1,14 @@
+# 上游 TEN-framework 原始文件运行时报错，必须使用 k2-fsa 带元数据的构建版本
+id: vad-ten-vad
+kind: vad
+backend: sherpa_onnx
+display_name: "Ten VAD"
+language: universal
+size_mb: 0.3
+source:
+  type: url_file
+  url: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.onnx
+files:
+  model: ten-vad.onnx
+params:
+  model_family: ten

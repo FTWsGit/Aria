@@ -16,7 +16,7 @@ alwaysApply: false
 | 加一个新的 VAD backend | 实现 `VADBackend` Protocol，在 `vad/` 目录新增文件，`pipeline.py` 的 `VAD_BACKENDS` 注册 |
 | 加一个新的翻译引擎 | 在 `translation/` 目录添加 translator 类，`create_translator()` 工厂函数新增 engine 分支 |
 | 加一个新的模型 | 在 `models/` 目录加 yaml 文件，`ModelRegistry` 自动扫描；无需改代码 |
-| 加一个新的设置项 | `settings_manager.py` 的 `DEFAULT_SETTINGS` 加默认值 + `settings_window/` 对应 tab 添加 UI 控件 |
+| 加一个新的设置项 | `settings_manager.py` 的 `DEFAULT_SETTINGS` 登记默认值 + `settings_window/` 对应 tab 添加 UI 控件 + `_gather_settings()` 保存与启动加载恢复接线，三件套缺一不可（只加控件不接线 = 设置静默失效） |
 | 加一个新的事件类型 | `events.py` 定义 dataclass，`PipelineSignals` 添加对应 `pyqtSignal` |
 | 加一个新的悬浮窗 | 继承 `SubtitleOverlay` 或复用 `SubtitleOverlay` 实例，源字幕和翻译字幕分离 |
 | 加一个新的 UI 页面 | 在 `ui/` 目录加 QWidget 子类，`App._on_start()` 中根据 settings 决定是否创建 |
@@ -56,7 +56,7 @@ signals.subtitle.connect(self._on_subtitle)
 
 ## 新增翻译引擎的完整流程
 
-1. `translation/` 下新建 `my_translator.py`，实现 `translate(text: str) -> str` 方法
+1. `translation/` 下新建 `my_translator.py`，实现 `translate(text: str, context: list[str] | None = None) -> str` 方法
 2. `translation/translator.py` 的 `create_translator()` 新增 `engine="my_engine"` 分支
 3. `settings_window.py` 的翻译引擎下拉列表自动显示新引擎（走 `create_translator` 工厂枚举）
 4. 无需修改 `TranslationStateManager`——它只认 translator 实例，不感知引擎类型

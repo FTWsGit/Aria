@@ -106,15 +106,21 @@ class TranslationStateManager:
 
     def __init__(
         self,
-        translator: Callable[[str], str] | None = None,
+        translator: Callable[..., str] | None = None,
+        context_sentences: int = 0,
     ):
         """
         Initialize the manager.
 
         Args:
-            translator: Function to translate text (source -> target)
+            translator: Function to translate text (source -> target); must
+                accept a ``context`` keyword argument when context sentences
+                are enabled
+            context_sentences: How many previously committed source sentences
+                to pass as translation context (0 disables the feature)
         """
         self.translator = translator
+        self._context_sentences = max(0, context_sentences)
 
         # Committed state
         self._committed_sources: list[str] = []  # Source sentences that are locked
@@ -128,6 +134,25 @@ class TranslationStateManager:
         # Most recently committed batch, for callers that want one message
         # per commit rather than the full running `committed_text`.
         self._last_committed_batch: tuple[str, str] | None = None
+
+    def _current_context(self) -> list[str] | None:
+        """Last N committed source sentences as translation context.
+
+        Returns None when the feature is disabled or nothing is committed
+        yet, so the translator keeps its original single-argument call shape.
+        """
+        if self._context_sentences <= 0 or not self._committed_sources:
+            return None
+        return self._committed_sources[-self._context_sentences :]
+
+    def _call_translator(self, text: str, context: list[str] | None) -> str:
+        """Call the translator; context is only forwarded when non-empty so
+        plain single-argument callables (e.g. test stubs) keep working."""
+        if not self.translator:
+            return ""
+        if context:
+            return self.translator(text, context=context)
+        return self.translator(text)
 
     def process_text(self, full_source_text: str) -> TranslationState:
         """
@@ -193,7 +218,7 @@ class TranslationStateManager:
         if self.translator:
             try:
                 draft_text = " ".join(draft_sources)
-                translated = self.translator(draft_text)
+                translated = self._call_translator(draft_text, self._current_context())
                 self._draft_translation = translated or ""
             except Exception as e:
                 warning(f"TSM: Translation error: {e}")
@@ -263,6 +288,10 @@ class TranslationStateManager:
         to_commit = self._draft_sources[:commit_target]
         batch_text = " ".join(to_commit)
 
+        # Context snapshot must precede the extend: the batch being committed
+        # must never appear in its own context
+        batch_context = self._current_context()
+
         # Add to committed sources
         self._committed_sources.extend(to_commit)
 
@@ -270,7 +299,7 @@ class TranslationStateManager:
         batch_translation = ""
         if self.translator:
             try:
-                batch_translation = self.translator(batch_text) or ""
+                batch_translation = self._call_translator(batch_text, batch_context) or ""
                 if batch_translation:
                     self._committed_paragraphs.append(batch_translation)
             except Exception as e:
@@ -285,7 +314,7 @@ class TranslationStateManager:
         if self._draft_sources and self.translator:
             try:
                 draft_text = " ".join(self._draft_sources)
-                self._draft_translation = self.translator(draft_text) or ""
+                self._draft_translation = self._call_translator(draft_text, self._current_context()) or ""
             except Exception as e:
                 warning(f"TSM: Draft re-translation error: {e}")
         else:

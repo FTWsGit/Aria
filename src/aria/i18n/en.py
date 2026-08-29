@@ -19,6 +19,7 @@ TRANSLATIONS = {
     "translation": "Translate",
     "engine": "Engine",
     "target_lang": "Target",
+    "translation_context_label": "Context sentences (0=off)",
     "engine_google": "Google Cloud",
     # Model settings
     "model_settings": "Model Settings",

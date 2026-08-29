@@ -47,6 +47,7 @@ class LiveCaptionsPipeline(BasePipeline):
         enable_translation: bool = False,
         translation_engine: str = "google",
         target_language: str = "zho_Hant",
+        translation_context_sentences: int = 0,
         # LiveCaptions settings
         auto_hide_window: bool = True,
         poll_interval: float = 0.1,
@@ -84,6 +85,7 @@ class LiveCaptionsPipeline(BasePipeline):
             target_language=target_language,
             openai_config=openai_config,
             on_message=on_message,
+            context_sentences=translation_context_sentences,
         )
 
         # State

@@ -56,6 +56,7 @@ class TranslationLayer:
         target_language: str,
         openai_config: OpenAIConfig,
         on_message: Callable[[TranscriptMessage], None] | None,
+        context_sentences: int = 0,
     ):
         self._translator = None
         self._state_manager = None
@@ -63,6 +64,11 @@ class TranslationLayer:
         self._enabled = enable_translation
         self._on_message = on_message
         self._msg_seq = 0
+        # Rolling window of committed source sentences for context-aware
+        # translation (VAD path); independent of the pipeline's display-side
+        # committed-source list.
+        self._context_sentences = max(0, context_sentences)
+        self._context_window: list[str] = []
 
         if enable_translation and TRANSLATION_AVAILABLE:
             try:
@@ -76,7 +82,10 @@ class TranslationLayer:
                     openai_max_tokens=openai_config.max_tokens,
                     openai_system_prompt=openai_config.system_prompt,
                 )
-                self._state_manager = TranslationStateManager(translator=self._translator.translate)
+                self._state_manager = TranslationStateManager(
+                    translator=self._translator.translate,
+                    context_sentences=self._context_sentences,
+                )
                 debug("TranslationLayer: initialized")
             except Exception as e:
                 warning(f"TranslationLayer: init failed: {e}")
@@ -128,15 +137,25 @@ class TranslationLayer:
 
     def process_committed_sentence(self, text: str) -> TranslationProcessResult:
         """Discrete-sentence mode for the VAD path: translate exactly once,
-        no fuzzy matching, no draft. Always returns a batch."""
+        no fuzzy matching, no draft. Always returns a batch.
+
+        When context sentences are enabled, the last N previously committed
+        source sentences are passed as context (never the current sentence);
+        the current sentence joins the window only after its own translation.
+        """
         if not text:
             return TranslationProcessResult("", "", None)
         if self._translator:
+            context = self._context_snapshot()
             try:
-                translated = self._translator.translate(text) or ""
+                if context:
+                    translated = self._translator.translate(text, context=context) or ""
+                else:
+                    translated = self._translator.translate(text) or ""
             except Exception as e:
                 warning(f"TranslationLayer: sentence translation error: {e}")
                 translated = ""
+            self._remember_committed_source(text)
             return TranslationProcessResult(translated, "", (text, translated))
         return TranslationProcessResult("", "", (text, None))
 
@@ -146,7 +165,30 @@ class TranslationLayer:
             self._state_manager.reset()
         if self._plain_segmenter:
             self._plain_segmenter.reset()
+        self._context_window.clear()
         self._msg_seq = 0
+
+    # ------------------------------------------------------------------
+    # Context window (VAD path)
+    # ------------------------------------------------------------------
+
+    def _context_snapshot(self) -> list[str] | None:
+        """Last N committed source sentences, or None when disabled/empty.
+
+        Returning None (instead of an empty list) keeps the translator's
+        original single-argument call shape for stubs and legacy engines.
+        """
+        if self._context_sentences <= 0 or not self._context_window:
+            return None
+        return self._context_window[-self._context_sentences :]
+
+    def _remember_committed_source(self, text: str) -> None:
+        """Append a committed source sentence to the rolling context window."""
+        if self._context_sentences <= 0:
+            return
+        self._context_window.append(text)
+        if len(self._context_window) > self._context_sentences:
+            self._context_window = self._context_window[-self._context_sentences :]
 
     # ------------------------------------------------------------------
     # Properties

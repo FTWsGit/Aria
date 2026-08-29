@@ -1,0 +1,13 @@
+id: vad-silero-v5
+kind: vad
+backend: sherpa_onnx
+display_name: "Silero VAD v5"
+language: universal
+size_mb: 3
+source:
+  type: url_file
+  url: https://github.com/snakers4/silero-vad/raw/refs/tags/v5.0/files/silero_vad.onnx
+files:
+  model: silero_vad.onnx
+params:
+  model_family: silero

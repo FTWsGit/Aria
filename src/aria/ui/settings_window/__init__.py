@@ -202,6 +202,7 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
             "timezone": tz_name,
             "enable_translation": self.trans_checkbox.isChecked(),
             "translation_engine": engine,
+            "translation_context_sentences": self.translation_context_spin.value(),
             "target_language": target_lang,
             "audio_source": self._get_selected_audio_source(),
         }
@@ -285,6 +286,8 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
         idx = self.target_lang_dropdown.findText(display_name)
         if idx >= 0:
             self.target_lang_dropdown.setCurrentIndex(idx)
+
+        self.translation_context_spin.setValue(sm.get("translation_context_sentences", 2))
 
         tz_name = sm.get("timezone", "system") or "system"
         if not validate_timezone_name(tz_name):

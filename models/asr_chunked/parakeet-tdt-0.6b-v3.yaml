@@ -1,0 +1,18 @@
+id: parakeet-tdt-0.6b-v3
+kind: asr_chunked
+backend: sherpa_onnx
+language: ru
+size_mb: 600
+display_name: "Parakeet TDT 0.6B v3 Sherpa-ONNX"
+recognizer_factory: from_transducer
+files:
+  encoder: encoder.int8.onnx
+  decoder: decoder.int8.onnx
+  joiner: joiner.int8.onnx
+  tokens: tokens.txt
+source:
+  type: modelscope
+  repo: "MrLicardo/sherpa-onnx-parakeet-tdt-0.6b-v3-int8"
+params:
+  provider: cpu
+  model_type: nemo_transducer

@@ -85,6 +85,7 @@ class PipelineFactory:
             translation_engine=settings.get("translation_engine", "google"),
             target_language=settings.get("target_language", "zho_Hant"),
             audio_source=settings.get("audio_source", "system"),
+            translation_context_sentences=settings.get("translation_context_sentences", 2),
             openai_config=openai_cfg,
             enable_vad=settings.get("enable_vad", False),
             vad_model_id=settings.get("vad_model_id", "vad-silero-v5"),
@@ -112,6 +113,7 @@ class PipelineFactory:
             enable_translation=settings.get("enable_translation", False),
             translation_engine=settings.get("translation_engine", "google"),
             target_language=settings.get("target_language", "zho_Hant"),
+            translation_context_sentences=settings.get("translation_context_sentences", 2),
             auto_hide_window=False,
             openai_config=openai_cfg,
         )
