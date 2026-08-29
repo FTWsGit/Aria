@@ -154,4 +154,14 @@ TRANSLATIONS = {
     "downloaded": "Downloaded",
     "not_downloaded": "Not downloaded",
     "delete_model_confirm": 'Delete model "{name}"?\nThe downloaded files will be removed from disk.',
+    # VAD
+    "vad_enable_label": "Enable VAD (skip silence, sentence-based commit)",
+    "vad_model_label": "VAD model",
+    "vad_advanced_label": "Advanced",
+    "vad_threshold_label": "Speech threshold",
+    "vad_min_silence_label": "Min silence duration (s)",
+    "vad_min_speech_label": "Min speech duration (s)",
+    "vad_max_speech_label": "Max speech duration (s)",
+    "vad_split_punctuation_label": "Split segment by punctuation",
+    "warning_vad_unavailable_fallback": "VAD model unavailable, falling back to non-VAD mode",
 }

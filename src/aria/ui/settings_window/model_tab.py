@@ -225,10 +225,12 @@ class ModelTabMixin:
             subprocess.run(["xdg-open", str(models_dir)])
 
     def _populate_model_dropdown(self):
-        """Populate model dropdown from ModelRegistry."""
+        """Populate model dropdown from ModelRegistry (ASR models only)."""
         self.model_dropdown.blockSignals(True)
         self.model_dropdown.clear()
         for spec in self._model_registry.list():
+            if spec.kind not in ("asr_streaming", "asr_chunked"):
+                continue
             self.model_dropdown.addItem(spec.display_name, spec.id)
         self.model_dropdown.blockSignals(False)
 

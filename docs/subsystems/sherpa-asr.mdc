@@ -35,7 +35,7 @@ result = recognizer.get_result(stream)
 
 ## 关键事实
 
-- 长期持有同一个 stream，不因静音 reset
+- 长期持有同一个 stream，不因静音 reset；仅 VAD 路径下每个语音段结束 `get_final_result()` 后 `reset()`（见「语音活动检测」）
 - 16 kHz 单声道 float32
 - 不再硬编码 `from_transducer`——`recognizer_factory` 从 yaml 配置读取
 - 不硬编码模型 URL——模型路径由 `ModelManager.get_model_path()` 解析

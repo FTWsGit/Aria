@@ -13,7 +13,7 @@ alwaysApply: false
 |---|---|---|
 | `app.py` | `App` | 应用协调器，管理 pipeline、overlay、console、tray 生命周期 |
 | `console_window.py` | `ConsoleWindow` | 操作员控制台：转录历史、启动/停止、清除、设置、退出 |
-| `settings_window/` | `SettingsWindow` | 独立设置窗口，每 tab 一个功能域：识别（模式/音频源/时区）、模型（下拉选择 + 下载/删除/进度）、翻译、通用；各 tab 是独立 mixin 文件 |
+| `settings_window/` | `SettingsWindow` | 独立设置窗口，每 tab 一个功能域：识别（模式/音频源/时区/VAD）、模型（下拉选择 + 下载/删除/进度）、翻译、通用；各 tab 是独立 mixin 文件 |
 | `subtitle_overlay.py` | `SubtitleOverlay` | 可拖拽/调整大小的悬浮窗，原文（淡化）+ 译文（突出）同窗渲染 |
 | `system_tray.py` | `SystemTray` | 系统托盘图标和菜单 |
 

@@ -126,6 +126,20 @@ class TranslationLayer:
             )
         )
 
+    def process_committed_sentence(self, text: str) -> TranslationProcessResult:
+        """Discrete-sentence mode for the VAD path: translate exactly once,
+        no fuzzy matching, no draft. Always returns a batch."""
+        if not text:
+            return TranslationProcessResult("", "", None)
+        if self._translator:
+            try:
+                translated = self._translator.translate(text) or ""
+            except Exception as e:
+                warning(f"TranslationLayer: sentence translation error: {e}")
+                translated = ""
+            return TranslationProcessResult(translated, "", (text, translated))
+        return TranslationProcessResult("", "", (text, None))
+
     def reset(self) -> None:
         """Reset all accumulated state (committed sources, draft, seq counter)."""
         if self._state_manager:

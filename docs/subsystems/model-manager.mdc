@@ -15,7 +15,7 @@ alwaysApply: false
 
 `ModelRegistry(models_dir)` 扫描 `models/*.yaml`，构建 `ModelSpec` 索引：
 
-- `ModelSpec` 包含 `id`、`kind`（`asr_streaming` / `asr_chunked`）、`backend`、`display_name`、`language`、`size_mb`、`source`、`params`、`raw`
+- `ModelSpec` 包含 `id`、`kind`（`asr_streaming` / `asr_chunked` / `vad`）、`backend`、`display_name`、`language`、`size_mb`、`source`、`params`、`raw`
 - `list(kind)` 按类型筛选，`get(model_id)` 按 ID 获取
 - 绝不触发下载
 
@@ -35,6 +35,7 @@ alwaysApply: false
 | `huggingface` | `huggingface_hub.snapshot_download` |
 | `modelscope` | `modelscope.snapshot_download` |
 | `url_zip` / `url_tar` | `urllib` 下载 + 解压 |
+| `url_file` | `urllib` 单文件直下，无解压（VAD `.onnx` 权重） |
 | `manual` | 本地路径，不下载 |
 
 ## 关键方法

@@ -44,7 +44,17 @@ class AudioCapture:
     def __init__(
         self,
         source: str = "system",
+        inject_silence: bool = False,
     ):
+        """
+        Args:
+            source: "system" or "mic:<index>"/"mic:default".
+            inject_silence: when the loopback device renders no audio it
+                produces no data at all; with this on, silence chunks are
+                emitted at the normal chunk cadence instead, so downstream
+                consumers (VAD) see a continuous timebase and can close
+                segments during true silence.
+        """
         self._pyaudio: object | None = None
         self._stream: object | None = None
         self._is_running = False
@@ -52,26 +62,21 @@ class AudioCapture:
         self._callback: Callable[[np.ndarray, int], None] | None = None
         self._capture_thread: threading.Thread | None = None
         self._source = source
+        self._inject_silence = inject_silence
 
     def _get_loopback_device(self) -> dict:
-        """Find the WASAPI loopback device for the default output."""
+        """Resolve the WASAPI loopback device of the default output device.
+
+        Must resolve via the default-output pairing, not by name: several
+        render devices share the same display prefix, so a name match can
+        bind to a silent virtual device.
+        """
         if self._pyaudio is None:
             self._pyaudio = pyaudio.PyAudio()
-
-        # Get default WASAPI output device
-        wasapi_info = self._pyaudio.get_host_api_info_by_type(pyaudio.paWASAPI)
-        default_output_idx = wasapi_info["defaultOutputDevice"]
-        default_output = self._pyaudio.get_device_info_by_index(default_output_idx)
-
-        # Find corresponding loopback device
-        for i in range(self._pyaudio.get_device_count()):
-            device = self._pyaudio.get_device_info_by_index(i)
-            if device.get("isLoopbackDevice", False) and device["name"].startswith(
-                default_output["name"].split(" (")[0]
-            ):
-                return device
-
-        raise RuntimeError("No WASAPI loopback device available for the default output.")
+        try:
+            return self._pyaudio.get_default_wasapi_loopback()
+        except Exception as e:
+            raise RuntimeError("No WASAPI loopback device available for the default output.") from e
 
     @classmethod
     def list_microphone_devices(cls) -> list[dict]:
@@ -172,6 +177,14 @@ class AudioCapture:
             try:
                 raw_data = self._audio_queue.get(timeout=0.1)
             except queue.Empty:
+                # Loopback delivers nothing while nothing renders; inject one
+                # silence chunk per timeout so the timebase stays continuous.
+                # Mic streams deliver continuously — a gap there is an anomaly,
+                # keep the previous skip behavior.
+                if self._inject_silence and not self._source.startswith(self.MIC_SOURCE_PREFIX):
+                    silence = np.zeros(int(self.SAMPLE_RATE * self.CHUNK_DURATION_MS / 1000), dtype=np.float32)
+                    if self._callback:
+                        self._callback(silence, self.SAMPLE_RATE)
                 continue
 
             # Convert bytes to numpy array

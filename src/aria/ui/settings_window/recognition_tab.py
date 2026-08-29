@@ -1,10 +1,13 @@
 """
-Recognition tab: ASR/LiveCaptions mode, audio source, timezone.
+Recognition tab: ASR/LiveCaptions mode, audio source, timezone, VAD.
 """
 
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -76,6 +79,77 @@ class RecognitionTabMixin:
         layout.addLayout(grid)
         layout.addStretch(1)
 
+        # === VAD section ===
+        vad_check = QCheckBox(t("vad_enable_label"))
+        vad_check.setChecked(False)
+        vad_check.toggled.connect(self._on_vad_enable_toggle)
+        self.vad_checkbox = vad_check
+        layout.addWidget(vad_check)
+
+        vad_model_row = QHBoxLayout()
+        vad_model_row.setContentsMargins(0, 0, 0, 0)
+        vad_model_row.setSpacing(6)
+        vad_model_row.addWidget(QLabel(t("vad_model_label") + ":"))
+        self.vad_model_dropdown = QComboBox()
+        self._populate_vad_model_dropdown()
+        self.vad_model_dropdown.currentTextChanged.connect(lambda _: self._persist_ui_settings())
+        vad_model_row.addWidget(self.vad_model_dropdown, 1)
+        self.vad_model_row = vad_model_row
+        layout.addLayout(vad_model_row)
+
+        # Advanced VAD settings (collapsible)
+        self.vad_advanced_group = QGroupBox(t("vad_advanced_label"))
+        self.vad_advanced_group.setCheckable(True)
+        self.vad_advanced_group.setChecked(False)
+        self.vad_advanced_group.toggled.connect(lambda _: self._persist_ui_settings())
+
+        adv_grid = QGridLayout(self.vad_advanced_group)
+        adv_grid.setContentsMargins(12, 10, 12, 10)
+        adv_grid.setSpacing(6)
+
+        self.vad_threshold_spin = QDoubleSpinBox()
+        self.vad_threshold_spin.setRange(0.05, 0.95)
+        self.vad_threshold_spin.setSingleStep(0.05)
+        self.vad_threshold_spin.setDecimals(2)
+        self.vad_threshold_spin.setValue(0.5)
+        self.vad_threshold_spin.valueChanged.connect(lambda _: self._persist_ui_settings())
+        adv_grid.addWidget(QLabel(t("vad_threshold_label")), 0, 0)
+        adv_grid.addWidget(self.vad_threshold_spin, 0, 1)
+
+        self.vad_min_silence_spin = QDoubleSpinBox()
+        self.vad_min_silence_spin.setRange(0.1, 5.0)
+        self.vad_min_silence_spin.setSingleStep(0.05)
+        self.vad_min_silence_spin.setDecimals(2)
+        self.vad_min_silence_spin.setValue(0.5)
+        self.vad_min_silence_spin.valueChanged.connect(lambda _: self._persist_ui_settings())
+        adv_grid.addWidget(QLabel(t("vad_min_silence_label")), 1, 0)
+        adv_grid.addWidget(self.vad_min_silence_spin, 1, 1)
+
+        self.vad_min_speech_spin = QDoubleSpinBox()
+        self.vad_min_speech_spin.setRange(0.05, 2.0)
+        self.vad_min_speech_spin.setSingleStep(0.05)
+        self.vad_min_speech_spin.setDecimals(2)
+        self.vad_min_speech_spin.setValue(0.25)
+        self.vad_min_speech_spin.valueChanged.connect(lambda _: self._persist_ui_settings())
+        adv_grid.addWidget(QLabel(t("vad_min_speech_label")), 2, 0)
+        adv_grid.addWidget(self.vad_min_speech_spin, 2, 1)
+
+        self.vad_max_speech_spin = QDoubleSpinBox()
+        self.vad_max_speech_spin.setRange(1.0, 60.0)
+        self.vad_max_speech_spin.setSingleStep(1.0)
+        self.vad_max_speech_spin.setDecimals(1)
+        self.vad_max_speech_spin.setValue(20.0)
+        self.vad_max_speech_spin.valueChanged.connect(lambda _: self._persist_ui_settings())
+        adv_grid.addWidget(QLabel(t("vad_max_speech_label")), 3, 0)
+        adv_grid.addWidget(self.vad_max_speech_spin, 3, 1)
+
+        self.vad_split_punctuation_check = QCheckBox(t("vad_split_punctuation_label"))
+        self.vad_split_punctuation_check.setChecked(True)
+        self.vad_split_punctuation_check.toggled.connect(lambda _: self._persist_ui_settings())
+        adv_grid.addWidget(self.vad_split_punctuation_check, 4, 0, 1, 2)
+
+        layout.addWidget(self.vad_advanced_group)
+
         return page
 
     def _on_mode_change(self, mode: str):
@@ -90,6 +164,9 @@ class RecognitionTabMixin:
             self.model_dropdown.setEnabled(True)
             self.model_dropdown.show()
             self.model_list_group.setEnabled(True)
+            self.vad_checkbox.show()
+            self._update_vad_controls_visibility()
+            self.vad_advanced_group.show()
         else:
             self.mode_asr_btn.setChecked(False)
             self.mode_livecaptions_btn.setChecked(True)
@@ -97,11 +174,57 @@ class RecognitionTabMixin:
             self.model_label.hide()
             self.model_dropdown.hide()
             self.model_list_group.setEnabled(False)
+            self.vad_checkbox.hide()
+            self._hide_vad_model_row()
+            self.vad_advanced_group.hide()
         self._persist_ui_settings()
 
     def _on_audio_source_change(self, _value: str):
         """Handle audio source change."""
         self._persist_ui_settings()
+
+    def _on_vad_enable_toggle(self, checked: bool):
+        """Handle VAD enable checkbox toggle."""
+        self._update_vad_controls_visibility()
+        self._persist_ui_settings()
+
+    def _update_vad_controls_visibility(self):
+        """Show/hide VAD model and advanced controls based on checkbox state."""
+        enabled = self.vad_checkbox.isChecked()
+        if enabled:
+            self._show_vad_model_row()
+        else:
+            self._hide_vad_model_row()
+
+    def _show_vad_model_row(self):
+        """Show VAD model dropdown row."""
+        for i in range(self.vad_model_row.count()):
+            w = self.vad_model_row.itemAt(i)
+            if w and w.widget():
+                w.widget().show()
+
+    def _hide_vad_model_row(self):
+        """Hide VAD model dropdown row."""
+        for i in range(self.vad_model_row.count()):
+            w = self.vad_model_row.itemAt(i)
+            if w and w.widget():
+                w.widget().hide()
+
+    def _populate_vad_model_dropdown(self):
+        """Populate VAD model dropdown from registry."""
+        if not hasattr(self, "_model_registry"):
+            return
+        self.vad_model_dropdown.blockSignals(True)
+        self.vad_model_dropdown.clear()
+        vad_models = self._model_registry.list(kind="vad")
+        if not vad_models:
+            self.vad_model_dropdown.addItem(t("not_downloaded"), None)
+            self.vad_model_dropdown.setEnabled(False)
+        else:
+            for spec in vad_models:
+                self.vad_model_dropdown.addItem(spec.display_name, spec.id)
+            self.vad_model_dropdown.setEnabled(True)
+        self.vad_model_dropdown.blockSignals(False)
 
     def _get_selected_audio_source(self) -> str:
         """Get selected audio source key from dropdown."""

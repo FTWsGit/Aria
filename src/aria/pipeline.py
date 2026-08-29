@@ -16,12 +16,15 @@ import numpy as np
 
 from .audio.capture import AudioCapture
 from .events import SubtitleEvent, TranscriptMessage
-from .logger import debug, exception, info, transcript
+from .logger import debug, exception, info, transcript, warning
 from .model_manager.manager import ModelManager
 from .model_manager.registry import ModelRegistry
+from .segmenter import segment_sentences
 from .transcription.base import ChunkedASR, StreamingASR
 from .transcription.sherpa_onnx import SherpaOnnxChunkedBackend, SherpaOnnxStreamingBackend
 from .translation.translation_layer import OpenAIConfig, TranslationLayer
+from .vad.gate import VadGate
+from .vad.sherpa_vad import SherpaOnnxVadBackend
 
 STREAMING_BACKENDS = {
     "sherpa_onnx": SherpaOnnxStreamingBackend,
@@ -29,6 +32,10 @@ STREAMING_BACKENDS = {
 
 CHUNKED_BACKENDS = {
     "sherpa_onnx": SherpaOnnxChunkedBackend,
+}
+
+VAD_BACKENDS = {
+    "sherpa_onnx": SherpaOnnxVadBackend,
 }
 
 
@@ -109,6 +116,11 @@ class StreamingPipeline(BasePipeline):
         audio_source: str = "system",
         # OpenAI translator settings
         openai_config: OpenAIConfig | None = None,
+        # VAD settings
+        enable_vad: bool = False,
+        vad_model_id: str = "vad-silero-v5",
+        vad_overrides: dict | None = None,
+        vad_split_by_punctuation: bool = True,
     ):
         """
         Initialize the streaming pipeline.
@@ -152,6 +164,26 @@ class StreamingPipeline(BasePipeline):
         else:
             raise ValueError(f"Unsupported ASR kind: {spec.kind}")
 
+        # VAD gate (optional voice-activity-gated mode)
+        self._vad_gate: VadGate | None = None
+        if enable_vad:
+            try:
+                vad_spec = registry.get(vad_model_id)
+                vad_root = model_manager.get_model_path(vad_spec)
+                if not model_manager.is_downloaded(vad_spec):
+                    raise RuntimeError(f"VAD model '{vad_model_id}' not downloaded")
+                vad_backend_cls = VAD_BACKENDS[vad_spec.backend]
+                merged = {
+                    **vad_spec.params,
+                    **{k: v for k, v in (vad_overrides or {}).items() if v is not None},
+                }
+                self._vad_gate = VadGate(vad_backend_cls(vad_spec, vad_root, params=merged))
+            except Exception as e:
+                warning(f"VAD unavailable, falling back to non-VAD pipeline: {e}")
+                if on_error:
+                    on_error("warning_vad_unavailable_fallback")
+                self._vad_gate = None
+
         # Translation layer (handles translator, state manager, segmenter)
         self._translation_layer = self._make_translation_layer(
             enable_translation=enable_translation,
@@ -162,7 +194,7 @@ class StreamingPipeline(BasePipeline):
         )
 
         # Audio capture
-        self._audio_capture = AudioCapture(source=audio_source)
+        self._audio_capture = AudioCapture(source=audio_source, inject_silence=self._vad_gate is not None)
 
         # State
         self._audio_queue: queue.Queue = queue.Queue()
@@ -185,6 +217,12 @@ class StreamingPipeline(BasePipeline):
         self._consecutive_translation_failures: int = 0
         self._asr_fatal: bool = False
 
+        # VAD state (used only when _vad_gate is not None)
+        self._sentence_queue: queue.Queue[str] = queue.Queue()
+        self._vad_committed_translations: list[str] = []
+        self._vad_split_by_punctuation: bool = vad_split_by_punctuation
+        self._vad_display_block: str = ""
+
         trans_status = "enabled (incremental)" if self._translation_layer.is_ready else "disabled"
         info(f"StreamingPipeline: mode={self._mode}, backend={spec.backend}, translation={trans_status}")
 
@@ -203,7 +241,57 @@ class StreamingPipeline(BasePipeline):
             except queue.Empty:
                 continue
 
-            # Dispatch by mode, wrapped in try/except for resilience
+            # VAD-gated path: completely bypasses legacy mode dispatch
+            if self._vad_gate is not None:
+                try:
+                    result = self._vad_gate.feed(audio)
+
+                    if self._mode == "streaming":
+                        if result.new_active_audio is not None and len(result.new_active_audio) > 0:
+                            raw_text = self._transcriber.process_audio(result.new_active_audio)
+                            if raw_text and raw_text != self._latest_raw_text:
+                                self._latest_raw_text = raw_text
+                                with self._text_lock:
+                                    snapshot = list(self._vad_committed_translations)
+                                committed_snapshot = "\n".join(snapshot) if snapshot else None
+                                self.on_subtitle(
+                                    SubtitleEvent(
+                                        text=raw_text,
+                                        language="",
+                                        confidence=1.0,
+                                        timestamp=time.time(),
+                                        is_partial=True,
+                                        committed_translation=committed_snapshot,
+                                        draft_translation="",
+                                        target_language=self._translation_layer.target_language,
+                                    )
+                                )
+
+                        if result.completed_segments:
+                            final_text = self._transcriber.get_final_result()
+                            self._transcriber.reset()
+                            self._latest_raw_text = ""
+                            if final_text:
+                                self._commit_final_text(final_text)
+
+                    elif self._mode == "chunked":
+                        for seg in result.completed_segments:
+                            raw_text = self._transcriber.transcribe(seg.samples, 16000)
+                            if raw_text:
+                                self._commit_final_text(raw_text)
+
+                    self._consecutive_asr_failures = 0
+                except Exception:
+                    self._consecutive_asr_failures += 1
+                    exception(f"ASR backend error ({self._consecutive_asr_failures}/{self.MAX_CONSECUTIVE_FAILURES})")
+                    if self._consecutive_asr_failures >= self.MAX_CONSECUTIVE_FAILURES:
+                        self._asr_fatal = True
+                        if self._on_error:
+                            self._on_error("error_asr_backend_failed")
+                        break
+                continue
+
+            # Legacy path (VAD disabled): dispatch by mode, wrapped in try/except
             try:
                 if self._mode == "streaming":
                     raw_text = self._transcriber.process_audio(audio)
@@ -270,13 +358,141 @@ class StreamingPipeline(BasePipeline):
                 if result.batch:
                     self._translation_layer.emit_message(result.batch[0], result.batch[1])
 
+    def _commit_final_text(self, text: str) -> None:
+        """Commit one or more final sentences from a completed VAD segment.
+
+        Multiple sentences of one commit are displayed as a single block:
+        emitting one event per sentence would put several replacements into
+        the same event-loop tick, and the overlay's replace semantics would
+        keep only the last one visible. With translation enabled, display
+        follows the translation arriving (a raw-only subtitle line is not
+        useful); transcript log and console history still run per sentence.
+        """
+        units = [u for u in (segment_sentences(text) if self._vad_split_by_punctuation else [text]) if u]
+        if not units:
+            return
+
+        display_block = "\n".join(units)
+        with self._text_lock:
+            self._vad_display_block = display_block
+
+        if self._translation_layer.is_ready:
+            for unit in units:
+                self._sentence_queue.put(unit)
+            return
+
+        self.on_subtitle(
+            SubtitleEvent(
+                text=display_block,
+                language="",
+                confidence=1.0,
+                timestamp=time.time(),
+                is_partial=False,
+                committed_translation="",
+                draft_translation="",
+                target_language=None,
+            )
+        )
+        for unit in units:
+            transcript(unit)
+            self._translation_layer.emit_message(unit, None)
+
     def _translation_loop(self) -> None:
         """
         Translation Thread: Low-speed translation processing.
         Consumes latest raw text, blocks on network calls.
         Conflates updates (skips intermediate frames if falling behind).
+
+        VAD path: drains _sentence_queue (FIFO, no drops), translates each
+        sentence once via process_committed_sentence, accumulates committed
+        translations for overlay display.
         """
         _translation_error_reported = False
+
+        if self._vad_gate is not None:
+            while self._running:
+                try:
+                    text = self._sentence_queue.get(timeout=0.1)
+                except queue.Empty:
+                    continue
+
+                try:
+                    result = self._translation_layer.process_committed_sentence(text)
+
+                    with self._text_lock:
+                        if result.committed_text:
+                            self._vad_committed_translations.append(result.committed_text)
+                            if len(self._vad_committed_translations) > 4:
+                                self._vad_committed_translations = self._vad_committed_translations[-4:]
+                        display_text = self._vad_display_block or text
+
+                    self.on_subtitle(
+                        SubtitleEvent(
+                            text=display_text,
+                            language="",
+                            confidence=1.0,
+                            timestamp=time.time(),
+                            is_partial=False,
+                            committed_translation="\n".join(self._vad_committed_translations),
+                            draft_translation="",
+                            target_language=self._translation_layer.target_language,
+                        )
+                    )
+
+                    if result.batch:
+                        transcript(result.batch[0])
+                        self._translation_layer.emit_message(*result.batch)
+
+                    self._consecutive_translation_failures = 0
+                    _translation_error_reported = False
+
+                except Exception:
+                    self._consecutive_translation_failures += 1
+                    exception(
+                        f"Translation error ({self._consecutive_translation_failures}/{self.MAX_CONSECUTIVE_FAILURES})"
+                    )
+                    if (
+                        self._consecutive_translation_failures >= self.MAX_CONSECUTIVE_FAILURES
+                        and not _translation_error_reported
+                        and self._on_error
+                    ):
+                        self._on_error("error_translation_unavailable")
+                        _translation_error_reported = True
+
+            # Drain remaining sentences after stop() so tail utterances are not lost
+            while True:
+                try:
+                    text = self._sentence_queue.get_nowait()
+                except queue.Empty:
+                    break
+                try:
+                    result = self._translation_layer.process_committed_sentence(text)
+                    with self._text_lock:
+                        if result.committed_text:
+                            self._vad_committed_translations.append(result.committed_text)
+                            if len(self._vad_committed_translations) > 4:
+                                self._vad_committed_translations = self._vad_committed_translations[-4:]
+                        display_text = self._vad_display_block or text
+                    self.on_subtitle(
+                        SubtitleEvent(
+                            text=display_text,
+                            language="",
+                            confidence=1.0,
+                            timestamp=time.time(),
+                            is_partial=False,
+                            committed_translation="\n".join(self._vad_committed_translations),
+                            draft_translation="",
+                            target_language=self._translation_layer.target_language,
+                        )
+                    )
+                    if result.batch:
+                        transcript(result.batch[0])
+                        self._translation_layer.emit_message(*result.batch)
+                except Exception:
+                    pass
+            return
+
+        # Legacy path (VAD disabled)
         while self._running:
             if not self._new_text_event.wait(timeout=0.1):
                 continue
@@ -339,6 +555,10 @@ class StreamingPipeline(BasePipeline):
             self._chunk_buffer = []
             self._chunk_samples = 0
             self._translation_layer.reset()
+            if self._vad_gate:
+                self._vad_gate.reset()
+                self._vad_committed_translations = []
+                self._vad_display_block = ""
 
             # Start audio capture first
             self._audio_capture.start(callback=self._on_audio)
@@ -377,8 +597,21 @@ class StreamingPipeline(BasePipeline):
         if self._process_thread:
             self._process_thread.join(timeout=2.0)
 
+        # Flush trailing VAD segment so the last utterance is not lost
+        if self._vad_gate:
+            trailing = self._vad_gate.flush()
+            if trailing is not None:
+                if self._mode == "streaming":
+                    final_text = self._transcriber.get_final_result()
+                    self._transcriber.reset()
+                else:
+                    final_text = self._transcriber.transcribe(trailing.samples, 16000)
+                if final_text:
+                    self._commit_final_text(final_text)
+
+        trans_join_timeout = 10.0 if self._vad_gate else 2.0
         if self._translation_thread:
-            self._translation_thread.join(timeout=2.0)
+            self._translation_thread.join(timeout=trans_join_timeout)
 
         # Clear queue
         while not self._audio_queue.empty():

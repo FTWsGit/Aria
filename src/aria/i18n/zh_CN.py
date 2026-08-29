@@ -154,4 +154,14 @@ TRANSLATIONS = {
     "downloaded": "已下载",
     "not_downloaded": "未下载",
     "delete_model_confirm": "确定要删除模型 “{name}” 吗？\n已下载的文件将从磁盘移除。",
+    # VAD
+    "vad_enable_label": "启用 VAD（跳过静音，按语句提交）",
+    "vad_model_label": "VAD 模型",
+    "vad_advanced_label": "高级",
+    "vad_threshold_label": "语音阈值",
+    "vad_min_silence_label": "最小静音时长 (s)",
+    "vad_min_speech_label": "最小语音时长 (s)",
+    "vad_max_speech_label": "最大语音时长 (s)",
+    "vad_split_punctuation_label": "按标点拆分语句",
+    "warning_vad_unavailable_fallback": "VAD 模型不可用，已回退到无 VAD 模式",
 }

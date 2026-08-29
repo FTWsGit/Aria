@@ -43,7 +43,9 @@ capture.stop()
 ## 关键事实
 
 - 使用 `pyaudiowpatch`（支持 WASAPI loopback）
+- system 源的 loopback 设备经 `get_default_wasapi_loopback()` 解析，始终绑定系统默认输出设备的回环，不按设备名匹配（多个渲染设备的友好名共用同一前缀，按名匹配会绑到静音的虚拟设备）
 - 设备枚举和默认设备变更需注意资源清理
 - 停止时 `terminate()` PyAudio 实例
 - 不依赖 VAD——音频直接输出给下游
 - `ts_tail` source 已移除，构造时自动 fallback 到 `"system"`
+- WASAPI loopback 在输出端无渲染时不产出任何数据（Windows 行为）；`inject_silence=True` 时以正常 chunk 节奏补发静音帧，让下游（VAD）在真静音期间仍能看到连续时间轴。默认关闭，仅 VAD 路径开启；mic 源不注入（麦克风流本身连续）

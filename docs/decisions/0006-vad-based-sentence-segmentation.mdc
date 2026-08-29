@@ -1,0 +1,30 @@
+---
+name: "0006-vad-based-sentence-segmentation"
+kind: "decision"
+description: "为什么用 VAD 语音段边界作为翻译/commit 的触发信号，而不是持续对增长文本做标点启发式分段"
+alwaysApply: false
+---
+
+# 0006. 基于 VAD 的句子边界驱动翻译与 commit
+
+## 背景
+
+`segmenter.py` 的标点启发式分段是"没有真正句子边界"时的权宜之计。它有三个代价：ASR 持续处理静音浪费算力；翻译在文本每次增长时都重新触发（0.1s 级别）；commit 时机基于对不完整 ASR 文本的猜测，而非确凿的语音停顿。
+
+## 决策
+
+引入 `vad/` 子系统（`VADBackend` Protocol + `VadGate` 编排层，首个实现基于 `sherpa_onnx.VoiceActivityDetector`），作为 `StreamingPipeline` 的可选前置层（`enable_vad` 开关，默认关闭）：
+
+- 静音期间不调用 ASR 后端（streaming 模式不喂入 `OnlineRecognizer`；chunked 模式不触发 `OfflineRecognizer`）
+- VAD 语音段结束 = 权威句子边界，触发一次 ASR 收尾（streaming: `get_final_result()` + `reset()`；chunked: 对整段 `transcribe()`）
+- 收尾文本经 `_sentence_queue`（FIFO，不丢弃）送入翻译线程，`TranslationLayer.process_committed_sentence()` 逐句翻译一次并直接 commit——不复用 `TranslationStateManager` 的模糊匹配/草稿覆盖状态机
+- `segment_sentences()` 保留，作为可选二级细分（一个 VAD 段内含多句时按标点再拆）
+
+## 后果
+
+- 优点：静音不占算力；翻译调用频率从"每次文本增长"降为"每句一次"；commit 时机由确凿的语音停顿决定
+- 代价：streaming 模式下每个 VAD 段重置一次 recognizer stream，偏离此前"长期持有同一 stream"（`docs/subsystems/sherpa-asr.mdc` 已注明该行为仅限 VAD 路径）
+- `TranslationStateManager`/`PlainSentenceSegmenter` 不删除，继续服务于 `enable_vad=False` 与 Live Captions
+- VAD 模型复用 `ModelRegistry`/`ModelManager`（`kind: vad`），仅新增 `source.type: url_file` 一种下载方式
+- 译文在 pipeline 侧累积最近 4 句再发 UI（overlay 译文区是全量替换渲染，单句发送会抹掉历史）
+- `enable_vad=False` 时零行为变化，作为默认值发布

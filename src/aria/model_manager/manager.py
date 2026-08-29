@@ -137,6 +137,9 @@ class ModelManager:
                 self._download_modelscope(model, callback)
             elif source_type in ("url_zip", "url_tar"):
                 self._download_url_spec(model, callback)
+            elif source_type == "url_file":
+                self._download_url_file_spec(model, callback)
+                return
             elif source_type == "manual":
                 # Manual type: no download needed, just verify path exists
                 if not Path(model.source["path"]).exists():
@@ -269,6 +272,24 @@ class ModelManager:
             shutil.move(tmp_path, local_dir / os.path.basename(url))
 
         os.unlink(tmp_path)
+
+    def _download_url_file_spec(
+        self,
+        model: ModelSpec,
+        callback: Callable[[str, float, str], None] | None,
+    ) -> None:
+        """Direct single-file download for VAD .onnx weights (no archive/extraction)."""
+        import urllib.request
+
+        url = model.source["url"]
+        local_dir = self.cache_dir / model.id
+        local_dir.mkdir(parents=True, exist_ok=True)
+        filename = model.raw.get("files", {}).get("model", Path(url).name)
+
+        if callback:
+            callback(model.id, 0.05, t("download_status_downloading").format(name=model.display_name))
+
+        urllib.request.urlretrieve(url, str(local_dir / filename))
 
     def delete(self, model: ModelSpec) -> bool:
         """Delete a downloaded model."""

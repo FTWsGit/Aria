@@ -37,9 +37,9 @@ class PipelineFactory:
                 return model_id
             except KeyError:
                 pass
-        all_models = registry.list()
-        if all_models:
-            return all_models[0].id
+        asr_models = [s for s in registry.list() if s.kind in ("asr_streaming", "asr_chunked")]
+        if asr_models:
+            return asr_models[0].id
         on_error("error_no_models_available")
         return None
 
@@ -63,6 +63,14 @@ class PipelineFactory:
             max_tokens=settings.get("openai_max_tokens", 1024),
             system_prompt=settings.get("openai_system_prompt", ""),
         )
+
+        vad_overrides = {
+            "threshold": settings.get("vad_threshold", 0.5),
+            "min_silence_duration": settings.get("vad_min_silence_duration", 0.5),
+            "min_speech_duration": settings.get("vad_min_speech_duration", 0.25),
+            "max_speech_duration": settings.get("vad_max_speech_duration", 20.0),
+        }
+
         model_id = PipelineFactory._resolve_model_id(settings, registry, on_error)
         if model_id is None:
             return None
@@ -78,6 +86,10 @@ class PipelineFactory:
             target_language=settings.get("target_language", "zho_Hant"),
             audio_source=settings.get("audio_source", "system"),
             openai_config=openai_cfg,
+            enable_vad=settings.get("enable_vad", False),
+            vad_model_id=settings.get("vad_model_id", "vad-silero-v5"),
+            vad_overrides=vad_overrides,
+            vad_split_by_punctuation=settings.get("vad_split_by_punctuation", True),
         )
 
     @staticmethod

@@ -12,11 +12,13 @@ alwaysApply: false
 | **ASR** | Automatic Speech Recognition，语音识别，将音频转为文本 |
 | **WASAPI** | Windows Audio Session API，Windows 上音频捕获/播放的核心 API |
 | **WASAPI loopback** | 捕获系统正在播放的声音（非麦克风），需 `pyaudiowpatch` 支持 |
-| **VAD** | Voice Activity Detection，检测音频中是否有人声；本项目不使用 VAD |
+| **VAD** | Voice Activity Detection，检测音频中是否有人声；本项目在 ASR 路径中可选启用（见「语音活动检测」） |
 | **Sherpa-ONNX** | 开源流式 ASR 引擎，支持 transducer/paraformer/whisper 等多种架构 |
 | **OnlineRecognizer** | Sherpa-ONNX 的流式识别器类，逐帧解码 |
 | **StreamingASR** | 流式 ASR 后端 Protocol，`process_audio()` 返回累计文本 |
 | **ChunkedASR** | 分段 ASR 后端 Protocol，`transcribe(audio, sr)` 返回完整文本 |
+| **VADBackend** | VAD 后端 Protocol，帧级语音判定 + 完整语音段队列 |
+| **VadGate** | backend 无关的 VAD 编排层：帧对齐 + 增量提取 |
 | **Live Captions** | Windows 11 内建字幕功能（Win+Ctrl+L），通过 UI Automation 读取文本 |
 | **UI Automation** | Windows 无障碍 API，用于读取其他窗口的文本内容 |
 | **NLLB** | Meta 的多语言翻译模型，本项目用其语言码格式（如 `zho_Hans`）标识目标语言 |

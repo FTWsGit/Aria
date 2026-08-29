@@ -59,6 +59,13 @@ class SettingsManager:
         "openai_max_tokens": 1024,
         "openai_system_prompt": "",
         "ui_language": "zh_CN",
+        "enable_vad": False,
+        "vad_model_id": "vad-silero-v5",
+        "vad_threshold": 0.5,
+        "vad_min_silence_duration": 0.5,
+        "vad_min_speech_duration": 0.25,
+        "vad_max_speech_duration": 20.0,
+        "vad_split_by_punctuation": True,
     }
 
     def __init__(self):

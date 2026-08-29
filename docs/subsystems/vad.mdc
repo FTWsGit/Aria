@@ -1,0 +1,42 @@
+---
+name: "vad"
+kind: "subsystem"
+description: "语音活动检测（VAD）。修改 vad/ 或 pipeline.py 中 VAD 相关分支时读。"
+alwaysApply: false
+---
+
+# 语音活动检测（VAD）
+
+## 职责
+
+在音频送入 ASR 前判断是否有人声：静音时跳过识别，语音段结束时给出权威的句子边界，驱动"识别→翻译→commit"的触发时机。为什么用 VAD 边界而不是标点启发式见 decision 0006。
+
+## 接口
+
+`VADBackend` Protocol（`vad/base.py`）：`frame_size`、`accept_waveform`、`is_speech_active`、`current_segment_samples`、`pop_ready_segments`、`flush`、`reset`。当前唯一实现 `SherpaOnnxVadBackend`（`vad/sherpa_vad.py`），封装 `sherpa_onnx.VoiceActivityDetector`（Silero / Ten VAD，按 `params.model_family` 选择，只配置所选族）。
+
+`VadGate`（`vad/gate.py`）是 backend-agnostic 的编排层，负责：
+
+- 帧对齐：`AudioCapture` 按 100ms（1600 samples）出块，VAD 窗口是 512（silero）或 256（ten），余数跨 `feed()` 调用保留
+- 增量提取：`current_segment` 是自段起点累积的样本，不能整段重复喂给流式识别器，`VadGate` 只吐出自上次调用以来的新增尾部；段结束（含 max_speech_duration 强制切分）时 delivered 计数先归零再取增量，保证新段从 sample 0 开始
+
+`SherpaOnnxVadBackend` 的关键行为：构造前检查模型文件存在（sherpa 构造失败时不抛 Python 异常只打 stderr）；`front.samples` 在 `pop` 前立即拷贝（`front` 是引用，下次调用任何方法即失效）；调参（threshold/min_silence 等）来自 pipeline 传入的合并 params，不直接 mutate registry 里共享的 `spec.params`。sherpa 1.13.x 的 silero VAD 不执行 `max_speech_duration`（配置字段存在但实现忽略），backend 自行强制切分：活跃样本计数达阈值时拷贝当前段并 reset 检测器，把切分作为已完成段交付，连续语音在 min_speech 重新武装后形成新段；`max_speech_duration=0` 关闭该行为。
+
+## 与 ASR/翻译的关系
+
+`pipeline.py` 按 `self._vad_gate is not None` 分支（`VAD_BACKENDS` 注册，同 `STREAMING_BACKENDS` 模式）：
+
+- streaming 模式：语音期间增量喂 `OnlineRecognizer`；VAD 段结束时 `get_final_result()` + `reset()`——此路径下每句重置 stream，区别于无 VAD 时"长期持有同一 stream"（见「Sherpa-ONNX 流式识别」）
+- chunked 模式：VAD 段结束时整段 `transcribe()`，替代按 `chunk_seconds` 的定长攒块
+
+VAD 段文本经 `_commit_final_text`（`segmenter.segment_sentences()` 可选按标点二级拆分）处理：一次 commit 的多句合并为**一个显示块**（逐句发多个事件会落在同一个事件循环 tick，overlay 的替换渲染只留最后一句）。翻译就绪时显示跟随译文到账——由翻译线程发事件，原文区显示整块、译文区追加该句的累积译文（只发原文的实时字幕没有意义）；翻译未就绪时合并块立即上屏。转录日志与控制台历史始终逐句。翻译线程逐句调 `TranslationLayer.process_committed_sentence()`——不经过 `TranslationStateManager` 的模糊匹配状态机（那是为"不断增长、无边界"的文本流设计的）。发往 UI 的 `committed_translation` 是最近 4 句译文的累积：overlay 对译文区是全量替换渲染，单句发送会抹掉历史。
+
+## 关键事实
+
+- `enable_vad=False`（默认）时以上分支全部不触发，行为与未接入 VAD 前完全一致
+- VAD 模型复用 `ModelRegistry`/`ModelManager`（`kind: vad`），下载源 `url_file`（单文件直下），不自动下载
+- VAD 模型未下载或加载失败时降级为无 VAD 行为，经 `on_error("warning_vad_unavailable_fallback")` 发非致命警告，不阻塞管道启动
+- `stop()` 在 join ASR 线程之后、join 翻译线程之前 `VadGate.flush()` 收尾句；翻译线程退出前排空 `_sentence_queue`
+- partial 字幕携带累积译文快照（无快照时为 None），避免语音期间译文区被清空
+- VAD 开启时 `AudioCapture` 以 `inject_silence=True` 运行（见「音频捕获」）：loopback 无渲染不出数据，不注入静音则 VAD 永远收不到静音帧、段无法按时关闭，句子会积压到渲染恢复才一起 commit
+- Live Captions 模式没有原始音频，不适用 VAD；设置界面在 Live Captions 模式下隐藏 VAD 区

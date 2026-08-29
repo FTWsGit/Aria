@@ -217,6 +217,19 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
             }
         )
 
+        # VAD settings
+        if mode == "livecaptions":
+            settings["enable_vad"] = False
+        else:
+            settings["enable_vad"] = self.vad_checkbox.isChecked()
+            idx = self.vad_model_dropdown.currentIndex()
+            settings["vad_model_id"] = self.vad_model_dropdown.itemData(idx) if idx >= 0 else "vad-silero-v5"
+            settings["vad_threshold"] = self.vad_threshold_spin.value()
+            settings["vad_min_silence_duration"] = self.vad_min_silence_spin.value()
+            settings["vad_min_speech_duration"] = self.vad_min_speech_spin.value()
+            settings["vad_max_speech_duration"] = self.vad_max_speech_spin.value()
+            settings["vad_split_by_punctuation"] = self.vad_split_punctuation_check.isChecked()
+
         self._save_settings(settings)
 
         return settings
@@ -289,3 +302,17 @@ class SettingsWindow(QMainWindow, ModelTabMixin, RecognitionTabMixin, Translatio
         self.openai_temperature.setValue(sm.get("openai_temperature", 0.2))
         self.openai_max_tokens.setValue(sm.get("openai_max_tokens", 1024))
         self.openai_system_prompt.setText(sm.get("openai_system_prompt", ""))
+
+        # VAD settings
+        self.vad_checkbox.setChecked(sm.get("enable_vad", False))
+        vad_model_id = sm.get("vad_model_id", "vad-silero-v5")
+        self._populate_vad_model_dropdown()
+        idx = self.vad_model_dropdown.findData(vad_model_id)
+        if idx >= 0:
+            self.vad_model_dropdown.setCurrentIndex(idx)
+        self.vad_threshold_spin.setValue(sm.get("vad_threshold", 0.5))
+        self.vad_min_silence_spin.setValue(sm.get("vad_min_silence_duration", 0.5))
+        self.vad_min_speech_spin.setValue(sm.get("vad_min_speech_duration", 0.25))
+        self.vad_max_speech_spin.setValue(sm.get("vad_max_speech_duration", 20.0))
+        self.vad_split_punctuation_check.setChecked(sm.get("vad_split_by_punctuation", True))
+        self._update_vad_controls_visibility()

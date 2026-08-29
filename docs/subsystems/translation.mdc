@@ -44,6 +44,10 @@ result = translator.translate("hello")
 - 滑动窗口 + 模糊匹配，区分已提交翻译和草稿翻译
 - 避免重复翻译已稳定的文本
 
+## 离散句模式（VAD 路径）
+
+VAD 开启时 pipeline 走 `process_committed_sentence(text)`：每句翻译恰一次，无模糊匹配、无 draft，恒返回 batch，不调用 TranslationStateManager。见「语音活动检测」。
+
 ## 依赖
 
 - `openai`：OpenAI-compatible HTTP client

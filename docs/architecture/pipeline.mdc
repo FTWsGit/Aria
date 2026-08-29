@@ -15,7 +15,9 @@ AudioCapture (WASAPI loopback / mic)
 StreamingPipeline._on_audio → queue
     ↓
 _process_loop (ASR 线程)
-    ↓ 按 mode 分发
+    ↓ 可选 VAD 门控（enable_vad，见「语音活动检测」）：
+      静音不送 ASR；语音段结束 → _commit_final_text → _sentence_queue（FIFO 不丢弃）
+    ↓ 按 mode 分支
     ├── streaming: backend.process_audio(audio) → 累计文本
     └── chunked: 攒块 → backend.transcribe(combined, 16000) → 完整文本
 _translation_loop (翻译线程，可选)
@@ -34,7 +36,7 @@ SubtitleEvent → UI
 
 - `ModelRegistry` 扫描 `models/*.yaml` 构建模型列表
 - `ModelManager` 检查 `models_cache/<model_id>/` 下权重是否已下载
-- `StreamingPipeline.__init__` 接受 `model_id` + `registry` + `model_manager`，按 `spec.kind` 分发到 `ASR_BACKENDS`
+- `StreamingPipeline.__init__` 接受 `model_id` + `registry` + `model_manager`，按 `spec.kind` 分发到 `STREAMING_BACKENDS`/`CHUNKED_BACKENDS`
 
 ## 两种 ASR 模式
 
@@ -47,6 +49,7 @@ SubtitleEvent → UI
 
 - 无翻译时：ASR 线程直接 emit `SubtitleEvent`
 - 有翻译时：ASR 线程只更新 `_latest_raw_text`，翻译线程负责 emit 带 `committed_translation`/`draft_translation` 的 `SubtitleEvent`
+- VAD 开启时：commit 走 `_sentence_queue`，翻译线程逐句 `process_committed_sentence`（不经过 TranslationStateManager）；`committed_translation` 发最近 4 句的累积
 
 ## 不变式
 
@@ -55,3 +58,7 @@ SubtitleEvent → UI
 - `_new_text_event` 防止翻译线程空转
 - 停止时先设 `_running = False`，再 set event 唤醒翻译线程
 - `asr_chunked` 模式攒块 buffer 在 `_process_loop` 内管理，不跨 `start/stop` 持久化
+- VAD 开启时 `_sentence_queue` 无界 FIFO，句子不丢弃；`_vad_committed_translations` 与 `_vad_display_block` 由 `_text_lock` 保护
+- VAD 的一次 commit（可能含多句）作为合并块显示：翻译就绪时随译文到账上屏，未就绪时立即上屏
+- VAD 开启时 `AudioCapture` 以 `inject_silence=True` 运行，loopback 静音期间补发零帧（见「音频捕获」），否则 VAD 段无法按时关闭
+- `stop()` 先 join ASR 线程，再 flush VAD 尾句并提交，最后 join 翻译线程（VAD 时超时放宽到 10s，留出尾句翻译时间）
