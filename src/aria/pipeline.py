@@ -220,6 +220,7 @@ class StreamingPipeline(BasePipeline):
         # VAD state (used only when _vad_gate is not None)
         self._sentence_queue: queue.Queue[str] = queue.Queue()
         self._vad_committed_translations: list[str] = []
+        self._vad_committed_sources: list[str] = []
         self._vad_split_by_punctuation: bool = vad_split_by_punctuation
         self._vad_display_block: str = ""
 
@@ -374,7 +375,10 @@ class StreamingPipeline(BasePipeline):
 
         display_block = "\n".join(units)
         with self._text_lock:
-            self._vad_display_block = display_block
+            self._vad_committed_sources.append(display_block)
+            if len(self._vad_committed_sources) > self.max_lines:
+                self._vad_committed_sources = self._vad_committed_sources[-self.max_lines :]
+            self._vad_display_block = "\n".join(self._vad_committed_sources)
 
         if self._translation_layer.is_ready:
             for unit in units:
@@ -383,7 +387,7 @@ class StreamingPipeline(BasePipeline):
 
         self.on_subtitle(
             SubtitleEvent(
-                text=display_block,
+                text=self._vad_display_block,
                 language="",
                 confidence=1.0,
                 timestamp=time.time(),
@@ -422,8 +426,8 @@ class StreamingPipeline(BasePipeline):
                     with self._text_lock:
                         if result.committed_text:
                             self._vad_committed_translations.append(result.committed_text)
-                            if len(self._vad_committed_translations) > 4:
-                                self._vad_committed_translations = self._vad_committed_translations[-4:]
+                            if len(self._vad_committed_translations) > self.max_lines:
+                                self._vad_committed_translations = self._vad_committed_translations[-self.max_lines :]
                         display_text = self._vad_display_block or text
 
                     self.on_subtitle(
@@ -470,8 +474,8 @@ class StreamingPipeline(BasePipeline):
                     with self._text_lock:
                         if result.committed_text:
                             self._vad_committed_translations.append(result.committed_text)
-                            if len(self._vad_committed_translations) > 4:
-                                self._vad_committed_translations = self._vad_committed_translations[-4:]
+                            if len(self._vad_committed_translations) > self.max_lines:
+                                self._vad_committed_translations = self._vad_committed_translations[-self.max_lines :]
                         display_text = self._vad_display_block or text
                     self.on_subtitle(
                         SubtitleEvent(
@@ -558,6 +562,7 @@ class StreamingPipeline(BasePipeline):
             if self._vad_gate:
                 self._vad_gate.reset()
                 self._vad_committed_translations = []
+                self._vad_committed_sources = []
                 self._vad_display_block = ""
 
             # Start audio capture first

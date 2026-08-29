@@ -744,3 +744,92 @@ def test_commit_waits_for_translation_before_display(monkeypatch, tmp_path):
     assert len(finals) == 1, f"Expected exactly one display event (after translation), got: {finals}"
     assert finals[0].text == "hello world"
     assert finals[0].committed_translation == "HELLO WORLD"
+
+
+# ---------------------------------------------------------------------------
+# Test 9: VAD source text rolling window
+# ---------------------------------------------------------------------------
+
+
+def test_vad_source_rolling_window(monkeypatch, tmp_path):
+    """VAD source text accumulates across commits and rolls out at max_lines.
+
+    Three consecutive commits with max_lines=2: the display keeps the two
+    most recent source texts and drops the oldest. Both the internal state
+    and the emitted SubtitleEvent reflect the rolling window.
+    """
+    fake_vad = FakeVADBackend(frame_size=512)
+    fake_vad.set_script(
+        [
+            (3, "start"),
+            (6, "stop"),  # segment 1
+            (9, "start"),
+            (12, "stop"),  # segment 2
+            (15, "start"),
+            (18, "stop"),  # segment 3
+        ]
+    )
+
+    # Chunked transcriber returning a different text per segment
+    responses = ["sentence one", "sentence two", "sentence three"]
+    call_count = [0]
+
+    class ScriptedChunkedTranscriber:
+        def transcribe(self, audio, sample_rate):
+            idx = min(call_count[0], len(responses) - 1)
+            call_count[0] += 1
+            return responses[idx]
+
+    monkeypatch.setitem(pipeline_mod.VAD_BACKENDS, "fake", lambda spec, root, **kw: fake_vad)
+    monkeypatch.setitem(pipeline_mod.CHUNKED_BACKENDS, "fake", lambda spec, root: ScriptedChunkedTranscriber())
+
+    audio_chunks = [_make_sine_chunk(0.1) for _ in range(20)]
+    fake_capture = FakeAudioCapture(chunks=audio_chunks)
+    monkeypatch.setattr(pipeline_mod, "AudioCapture", lambda source=None, **kw: fake_capture)
+
+    yamls = [_make_asr_chunked_yaml(), _make_vad_yaml(model_id="vad-test", backend="fake")]
+    registry, manager = _make_registry_and_manager(tmp_path, yamls)
+
+    subtitles: list[SubtitleEvent] = []
+    messages: list[TranscriptMessage] = []
+
+    pipeline = pipeline_mod.StreamingPipeline(
+        model_id="test-chunked",
+        registry=registry,
+        model_manager=manager,
+        enable_translation=False,
+        enable_vad=True,
+        vad_model_id="vad-test",
+        vad_split_by_punctuation=False,
+        max_lines=2,
+    )
+
+    # Swap in a translation layer with a slow fake translator so the
+    # translation thread has time to observe _vad_display_block after
+    # all commits are done.
+    ready_layer = TranslationLayer(
+        enable_translation=True,
+        translation_engine="google",
+        target_language="zh",
+        openai_config=pipeline_mod.OpenAIConfig(),
+        on_message=messages.append,
+    )
+    object.__setattr__(ready_layer, "_translator", SlowFakeTranslator())
+    pipeline._translation_layer = ready_layer
+
+    pipeline.on_subtitle = subtitles.append
+    pipeline.start()
+    time.sleep(3.0)
+    pipeline.stop()
+
+    # Internal state: two most recent sources kept, oldest rolled out
+    assert pipeline._vad_committed_sources == ["sentence two", "sentence three"]
+    assert pipeline._vad_display_block == "sentence two\nsentence three"
+
+    # Emitted event reflects accumulated source text
+    finals = [e for e in subtitles if not e.is_partial]
+    assert len(finals) >= 1, f"Expected at least one final event, got: {len(finals)}"
+    last_final = finals[-1]
+    assert "sentence one" not in last_final.text, f"Oldest should roll out: {last_final.text}"
+    assert "sentence two" in last_final.text, f"Expected 'sentence two': {last_final.text}"
+    assert "sentence three" in last_final.text, f"Expected 'sentence three': {last_final.text}"
