@@ -17,7 +17,7 @@ alwaysApply: false
 
 `VadGate`（`vad/gate.py`）是 backend-agnostic 的编排层，负责：
 
-- 帧对齐：`AudioCapture` 按 100ms（1600 samples）出块，VAD 窗口是 512（silero）或 256（ten），余数跨 `feed()` 调用保留
+- 帧对齐：`AudioCapture` 按 100ms（1600 samples）出块，VAD 窗口是 512（silero）或 256（ten），余数跨 `feed()` 调用保留；`flush()` 时把尚未凑满一帧的余量补零喂给 backend 再收尾，避免 stop() 时丢失这不到一帧（≤32ms）的尾音
 - 增量提取：`current_segment` 是自段起点累积的样本，不能整段重复喂给流式识别器，`VadGate` 只吐出自上次调用以来的新增尾部；段结束（含 max_speech_duration 强制切分）时 delivered 计数先归零再取增量，保证新段从 sample 0 开始
 
 `SherpaOnnxVadBackend` 的关键行为：构造前检查模型文件存在（sherpa 构造失败时不抛 Python 异常只打 stderr）；`front.samples` 在 `pop` 前立即拷贝（`front` 是引用，下次调用任何方法即失效）；调参（threshold/min_silence 等）来自 pipeline 传入的合并 params（来源规则见「参数来源与优先级」），不直接 mutate registry 里共享的 `spec.params`。sherpa 1.13.x 的 silero VAD 不执行 `max_speech_duration`（配置字段存在但实现忽略），backend 自行强制切分：活跃样本计数达阈值时拷贝当前段并 reset 检测器，把切分作为已完成段交付，连续语音在 min_speech 重新武装后形成新段；`max_speech_duration=0` 关闭该行为。
@@ -38,7 +38,16 @@ VAD 调参参数按归属分两类：
 - streaming 模式：语音期间增量喂 `OnlineRecognizer`；VAD 段结束时 `get_final_result()` + `reset()`——此路径下每句重置 stream，区别于无 VAD 时"长期持有同一 stream"（见「Sherpa-ONNX 流式识别」）
 - chunked 模式：VAD 段结束时整段 `transcribe()`，替代按 `chunk_seconds` 的定长攒块
 
-VAD 段文本经 `_commit_final_text`（`segmenter.segment_sentences()` 可选按标点二级拆分）处理：一次 commit 的多句合并为**一个显示块**（逐句发多个事件会落在同一个事件循环 tick，overlay 的替换渲染只留最后一句）。翻译就绪时显示跟随译文到账——由翻译线程发事件，原文区显示整块、译文区追加该句的累积译文（只发原文的实时字幕没有意义）；翻译未就绪时合并块立即上屏。转录日志与控制台历史始终逐句。翻译线程逐句调 `TranslationLayer.process_committed_sentence()`——不经过 `TranslationStateManager` 的模糊匹配状态机（那是为"不断增长、无边界"的文本流设计的）。发往 UI 的 `committed_translation` 是最近 4 句译文的累积：overlay 对译文区是全量替换渲染，单句发送会抹掉历史。
+VAD 段文本经 `_commit_final_text`（`segmenter.segment_sentences()` 可选按标点二级拆分）处理：一次 commit 产出的句子先追加进原文滚动窗口 `_vad_committed_sources`（按句计数，超过 `max_lines` 丢最旧的），显示时整窗口拼接成一块发给 overlay——逐句发多个事件会落在同一个事件循环 tick，overlay 的替换渲染只留最后一句。翻译就绪时显示跟随译文到账——由翻译线程逐句发事件，原文区显示 `_vad_committed_sources` 整窗口，译文区显示 `_vad_committed_translations` 整窗口（同样按句累积、同一个 `max_lines` 上限）；翻译未就绪时原文窗口立即上屏。转录日志与控制台历史始终逐句。翻译线程逐句调 `TranslationLayer.process_committed_sentence()`——不经过 `TranslationStateManager` 的模糊匹配状态机（那是为"不断增长、无边界"的文本流设计的）。两个窗口都按句（而非按 commit）计数，是为了在 `vad_split_by_punctuation=True` 且单次 commit 产出多句时，原文和译文窗口的"行数"含义保持一致。
+
+## 已知限制与调参建议
+
+"逐句 commit 附近识别变差"排查记录（结论供以后不必重新调查一遍）：
+
+- **不是 segment 边界裁切音频的问题**：查过 sherpa-onnx 上游 C++ 实现（`voice-activity-detector.cc`），语音开始时 `start_` 会回溯 `2×window_size + min_speech_duration`（约 300ms+）取 segment 起点，结束时用 `buffer_.Tail() - min_silence_duration_samples` 定位真实结束点——起止都已补偿检测延迟，不会裁到人声。这两端不是 bug 来源。
+- **真正的原因是短句缺少上下文**：把连续语音切成一句一句独立喂给 ASR，天然比"一直喂同一个流"给模型的上下文更少——多数 ASR 模型（尤其非流式/chunked 的）在很短的输入上单句准确率本来就会比长上下文差一些，这是 VAD 分段类方案的通用取舍，不是本项目实现的缺陷。streaming 模式还额外叠加一层：每个 VAD 段都 `reset()` stream（见上「与 ASR/翻译的关系」），每句都是冷启动的 decoder，没有跨句的运行状态，这也会比"从不 reset 的长流"更容易在句首出几个字的偏差。
+- **调参方向**：`min_silence_duration` 调大（如 0.5 → 0.7-0.8s）能减少过度切分、拿到更完整更长的段，用换来的段长度换识别率，代价是单句 commit 延迟变高；对准确率要求高于延迟的场景，优先选 chunked（offline）后端而非 streaming——offline 识别器一次性看到整段非因果上下文，没有 streaming 那层逐句冷启动成本。
+- **`max_speech_duration` 强制切分不丢音频，只是切分点会有一次性小延迟**：backend 在切分时调用 `self._vad.reset()`，这会清空 sherpa 内部 buffer 和模型状态，但后续音频仍持续 push 进（已清空的）buffer；等 `min_speech_duration` 重新武装、`is_speech_active()` 再次为 True 时，`current_segment_samples()` 会一次性吐出重新武装期间攒下的全部音频（不是丢弃，是延迟到下一次有值的 `feed()` 才吐）。实际效果是这段时间内 streaming 模式的增量字幕会停更几百毫秒、随后一次性追上，功能正确，只是有观感上的卡顿，不是"这段音频丢了没识别"。该情形只在单次连续发言超过 `max_speech_duration`（默认 20s）时触发，日常按句子说话基本不会碰到。
 
 ## 关键事实
 

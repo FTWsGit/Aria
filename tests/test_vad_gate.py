@@ -369,6 +369,53 @@ def test_flush_resets_delivered():
     assert gate._delivered_in_segment == 0
 
 
+def test_flush_feeds_leftover_before_closing():
+    """flush() must not silently drop the sub-frame leftover buffer.
+
+    1600 % 512 == 64, so after one feed() there are 64 samples sitting in
+    _leftover that never completed a frame. Before this fix, flush() called
+    backend.flush()/pop_ready_segments() without ever handing that leftover
+    to the backend, so the last ~64 samples (up to one frame, ~32ms at 16kHz)
+    of real audio were dropped from the trailing segment on every stop().
+    """
+    backend = FakeVADBackend(frame_size=512)
+    backend.set_script({2: "activate"})  # active by the time leftover exists
+    gate = VadGate(backend)
+
+    gate.feed(_make_chunk(1600))
+    assert len(gate._leftover) == 64
+    frames_before = backend.total_frames_received
+
+    trailing = gate.flush()
+
+    # The leftover must have been fed to the backend as one final frame
+    # (zero-padded to frame_size) before flush()/pop_ready_segments() ran.
+    assert backend.total_frames_received == frames_before + 1
+    assert len(gate._leftover) == 0
+
+    # And that final padded frame's real samples must show up in the
+    # trailing segment (the fake backend appends every frame received while
+    # active to the current segment).
+    assert trailing is not None
+    leftover_values = _make_chunk(1600)[-64:]
+    assert np.array_equal(trailing.samples[-512 : -512 + 64], leftover_values)
+    # Padding after the real leftover samples must be zero, not garbage.
+    assert np.all(trailing.samples[-512 + 64 :] == 0)
+
+
+def test_flush_does_not_feed_leftover_when_empty():
+    """flush() with no pending leftover must not feed a spurious padded frame."""
+    backend = FakeVADBackend(frame_size=512)
+    gate = VadGate(backend)
+
+    gate.feed(_make_chunk(512))  # exactly one frame, no leftover
+    assert len(gate._leftover) == 0
+    frames_before = backend.total_frames_received
+
+    gate.flush()
+    assert backend.total_frames_received == frames_before
+
+
 # ===================================================================
 # Test 6 — Reset
 # ===================================================================

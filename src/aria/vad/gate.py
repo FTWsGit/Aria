@@ -75,6 +75,17 @@ class VadGate:
         Returns:
             The last completed segment, or None if no segment was produced.
         """
+        # Up to frame_size-1 samples may be sitting unclassified in the
+        # leftover buffer (not enough to complete a frame yet). Feed them as
+        # a final, short, zero-padded frame so they're not silently dropped
+        # from the last segment.
+        if len(self._leftover) > 0:
+            n = self._backend.frame_size
+            padded = np.zeros(n, dtype=np.float32)
+            padded[: len(self._leftover)] = self._leftover
+            self._backend.accept_waveform(padded)
+            self._leftover = np.zeros(0, dtype=np.float32)
+
         self._backend.flush()
         segs = self._backend.pop_ready_segments()
         self._delivered_in_segment = 0

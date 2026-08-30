@@ -393,9 +393,8 @@ class StreamingPipeline(BasePipeline):
         if not units:
             return
 
-        display_block = "\n".join(units)
         with self._text_lock:
-            self._vad_committed_sources.append(display_block)
+            self._vad_committed_sources.extend(units)
             if len(self._vad_committed_sources) > self.max_lines:
                 self._vad_committed_sources = self._vad_committed_sources[-self.max_lines :]
             self._vad_display_block = "\n".join(self._vad_committed_sources)

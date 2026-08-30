@@ -835,9 +835,72 @@ def test_vad_source_rolling_window(monkeypatch, tmp_path):
     assert "sentence three" in last_final.text, f"Expected 'sentence three': {last_final.text}"
 
 
-# ---------------------------------------------------------------------------
-# Test 10: VAD params priority — Settings/UI over yaml
-# ---------------------------------------------------------------------------
+def test_vad_source_window_counts_sentences_not_commits(monkeypatch, tmp_path):
+    """max_lines counts sentences, not commit events.
+
+    A single commit that punctuation-splits into two sentences must count as
+    two entries against max_lines — not one — so the window doesn't secretly
+    hold more visible lines than max_lines once split blocks are involved,
+    and so the source window's line-count semantics match the translation
+    window's (both accumulate per-sentence).
+    """
+    fake_vad = FakeVADBackend(frame_size=512)
+    fake_vad.set_script(
+        [
+            (3, "start"),
+            (6, "stop"),  # segment 1: two sentences via punctuation split
+            (9, "start"),
+            (12, "stop"),  # segment 2: one sentence
+        ]
+    )
+
+    responses = ["Hello there. How are you", "sentence three"]
+    call_count = [0]
+
+    class ScriptedChunkedTranscriber:
+        def transcribe(self, audio, sample_rate):
+            idx = min(call_count[0], len(responses) - 1)
+            call_count[0] += 1
+            return responses[idx]
+
+    monkeypatch.setitem(pipeline_mod.VAD_BACKENDS, "fake", lambda spec, root, **kw: fake_vad)
+    monkeypatch.setitem(pipeline_mod.CHUNKED_BACKENDS, "fake", lambda spec, root: ScriptedChunkedTranscriber())
+
+    audio_chunks = [_make_sine_chunk(0.1) for _ in range(14)]
+    fake_capture = FakeAudioCapture(chunks=audio_chunks)
+    monkeypatch.setattr(pipeline_mod, "AudioCapture", lambda source=None, **kw: fake_capture)
+
+    yamls = [_make_asr_chunked_yaml(), _make_vad_yaml(model_id="vad-test", backend="fake")]
+    registry, manager = _make_registry_and_manager(tmp_path, yamls)
+
+    subtitles: list[SubtitleEvent] = []
+
+    pipeline = pipeline_mod.StreamingPipeline(
+        model_id="test-chunked",
+        registry=registry,
+        model_manager=manager,
+        enable_translation=False,
+        enable_vad=True,
+        vad_model_id="vad-test",
+        vad_split_by_punctuation=True,
+        max_lines=2,
+    )
+    pipeline.on_subtitle = subtitles.append
+
+    pipeline.start()
+    time.sleep(1.0)
+    pipeline.stop()
+
+    # "Hello there" (the older of the two sentences from commit 1) must have
+    # rolled out even though it came from the same commit as "How are you" —
+    # the window is keyed on sentence count, not on which commit produced it.
+    assert pipeline._vad_committed_sources == ["How are you", "sentence three"]
+    assert pipeline._vad_display_block == "How are you\nsentence three"
+
+    finals = [e for e in subtitles if not e.is_partial]
+    assert finals, "Expected at least one final display event"
+    assert "Hello there" not in finals[-1].text
+    assert finals[-1].text == "How are you\nsentence three"
 
 
 def test_vad_params_ui_owned_keys_ignore_yaml(monkeypatch, tmp_path):
