@@ -35,16 +35,6 @@ class _RotatingAppendFileHandler(logging.handlers.RotatingFileHandler):
         kwargs.setdefault("encoding", "utf-8")
         super().__init__(str(file_path), maxBytes=maxBytes, backupCount=backupCount, **kwargs)
 
-    # Disable logging's default thread lock for this handler.
-    def createLock(self):
-        self.lock = None
-
-    def acquire(self):
-        return
-
-    def release(self):
-        return
-
     def emit(self, record: logging.LogRecord) -> None:
         super().emit(record)
         self.flush()
